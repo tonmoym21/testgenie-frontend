@@ -44,16 +44,16 @@ export default function LoginPage() {
           <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
             <Beaker size={22} />
           </div>
-          <span className="text-xl font-semibold tracking-tight">TestGenie</span>
+          <span className="text-xl font-semibold tracking-tight">TestForge</span>
         </div>
 
         <div className="max-w-md">
           <h1 className="text-4xl font-semibold leading-tight mb-4">
-            AI-powered test case analysis for modern QA teams
+            Build. Run. Trust your tests.
           </h1>
           <p className="text-brand-300 text-lg leading-relaxed">
-            Create projects, manage test cases, and leverage AI to find coverage gaps,
-            detect duplicates, and assess quality automatically.
+            Create projects, manage test cases, and leverage AI to find coverage gaps, detect duplicates, and assess quality automatically.
+.
           </p>
         </div>
 
@@ -69,7 +69,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center">
               <Beaker size={22} className="text-white" />
             </div>
-            <span className="text-xl font-semibold tracking-tight">TestGenie</span>
+            <span className="text-xl font-semibold tracking-tight">TestForge</span>
           </div>
 
           <h2 className="text-2xl font-semibold mb-1">
@@ -77,8 +77,8 @@ export default function LoginPage() {
           </h2>
           <p className="text-gray-500 mb-8 text-sm">
             {isRegister
-              ? 'Get started with TestGenie in seconds'
-              : 'Sign in to continue to TestGenie'}
+              ? 'Get started with TestForge in seconds'
+              : 'Sign in to continue to TestForge'}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">

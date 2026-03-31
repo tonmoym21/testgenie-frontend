@@ -27,8 +27,8 @@ export default function Layout({ children }) {
               <Beaker size={18} />
             </div>
             <div>
-              <span className="font-semibold text-base tracking-tight">TestGenie</span>
-              <span className="block text-[10px] text-brand-300 uppercase tracking-widest">AI-Powered QA</span>
+              <span className="font-semibold text-base tracking-tight">TestForge</span>
+              <span className="block text-[10px] text-brand-300 uppercase tracking-widest">Build. Run. Trust.</span>
             </div>
           </Link>
         </div>
