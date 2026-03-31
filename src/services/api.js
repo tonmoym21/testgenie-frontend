@@ -1,4 +1,6 @@
-const API_BASE = '/api';
+const API_BASE = window.location.hostname === 'localhost'
+  ? '/api'
+  : 'https://testgenie-backend-production.up.railway.app/api';
 
 class ApiService {
   constructor() {
