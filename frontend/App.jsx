@@ -24,11 +24,13 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId" element={<ProtectedRoute><ProjectDetailPage /></ProtectedRoute>} />
       <Route path="/executions" element={<ProtectedRoute><ExecutionsPage /></ProtectedRoute>} />
       <Route path="/executions/:executionId" element={<ProtectedRoute><ExecutionDetailPage /></ProtectedRoute>} />
+
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
