@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import {
   ArrowLeft, Plus, Loader2, Trash2, Pencil, Check, X, Zap,
@@ -30,7 +30,6 @@ const ANALYSIS_TYPES = [
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
-  const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [testCases, setTestCases] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +41,14 @@ export default function ProjectDetailPage() {
   const [newContent, setNewContent] = useState('');
   const [newPriority, setNewPriority] = useState('medium');
   const [creating, setCreating] = useState(false);
+
+  // Edit test case state
+  const [editingTc, setEditingTc] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editPriority, setEditPriority] = useState('medium');
+  const [editStatus, setEditStatus] = useState('draft');
+  const [saving, setSaving] = useState(false);
 
   // Analyze state
   const [showAnalyze, setShowAnalyze] = useState(false);
@@ -88,6 +95,33 @@ export default function ProjectDetailPage() {
       setError(err.message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openEdit = (tc) => {
+    setEditingTc(tc);
+    setEditTitle(tc.title);
+    setEditContent(tc.content);
+    setEditPriority(tc.priority);
+    setEditStatus(tc.status);
+  };
+
+  const handleEditTestCase = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const updated = await api.updateTestCase(projectId, editingTc.id, {
+        title: editTitle,
+        content: editContent,
+        priority: editPriority,
+        status: editStatus,
+      });
+      setTestCases((prev) => prev.map((tc) => (tc.id === editingTc.id ? updated : tc)));
+      setEditingTc(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -264,7 +298,6 @@ export default function ProjectDetailPage() {
                 <p className="text-sm text-gray-700 mb-4 leading-relaxed">{analysisResult.result.summary}</p>
               )}
 
-              {/* Render gaps */}
               {analysisResult.result?.gaps?.length > 0 && (
                 <div className="space-y-2">
                   <h5 className="text-xs font-semibold uppercase text-gray-400">Gaps Found</h5>
@@ -282,7 +315,6 @@ export default function ProjectDetailPage() {
                 </div>
               )}
 
-              {/* Render recommendations */}
               {analysisResult.result?.recommendations?.length > 0 && (
                 <div className="mt-4">
                   <h5 className="text-xs font-semibold uppercase text-gray-400 mb-2">Recommendations</h5>
@@ -297,7 +329,6 @@ export default function ProjectDetailPage() {
                 </div>
               )}
 
-              {/* Render risks */}
               {analysisResult.result?.risks?.length > 0 && (
                 <div className="space-y-2">
                   <h5 className="text-xs font-semibold uppercase text-gray-400">Risks</h5>
@@ -314,7 +345,6 @@ export default function ProjectDetailPage() {
                 </div>
               )}
 
-              {/* Render duplicates */}
               {analysisResult.result?.duplicates?.length > 0 && (
                 <div className="space-y-2">
                   <h5 className="text-xs font-semibold uppercase text-gray-400">Duplicates</h5>
@@ -327,7 +357,6 @@ export default function ProjectDetailPage() {
                 </div>
               )}
 
-              {/* Render issues (quality review) */}
               {analysisResult.result?.issues?.length > 0 && (
                 <div className="space-y-2">
                   <h5 className="text-xs font-semibold uppercase text-gray-400">Issues</h5>
@@ -390,12 +419,82 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
               <div className="flex gap-3 justify-end pt-2">
-                <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary">
-                  Cancel
-                </button>
+                <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary">Cancel</button>
                 <button type="submit" disabled={creating} className="btn-primary">
                   {creating && <Loader2 size={16} className="animate-spin" />}
                   Add Test Case
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit test case modal */}
+      {editingTc && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+            <h2 className="text-lg font-semibold mb-4">Edit Test Case</h2>
+            <form onSubmit={handleEditTestCase} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Title</label>
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="input"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Test Steps / Content</label>
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="input font-mono text-sm resize-none"
+                  rows={6}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Priority</label>
+                <div className="flex gap-2">
+                  {['low', 'medium', 'high', 'critical'].map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setEditPriority(p)}
+                      className={`badge cursor-pointer capitalize px-3 py-1.5 ${
+                        editPriority === p ? PRIORITY_STYLES[p] : 'bg-gray-50 text-gray-400'
+                      } transition-colors`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
+                <div className="flex gap-2 flex-wrap">
+                  {Object.keys(STATUS_STYLES).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setEditStatus(s)}
+                      className={`badge cursor-pointer capitalize px-3 py-1.5 ${
+                        editStatus === s ? STATUS_STYLES[s] : 'bg-gray-50 text-gray-400'
+                      } transition-colors`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end pt-2">
+                <button type="button" onClick={() => setEditingTc(null)} className="btn-secondary">Cancel</button>
+                <button type="submit" disabled={saving} className="btn-primary">
+                  {saving && <Loader2 size={16} className="animate-spin" />}
+                  Save Changes
                 </button>
               </div>
             </form>
@@ -439,16 +538,9 @@ export default function ProjectDetailPage() {
                       <span className={`badge text-[10px] ${PRIORITY_STYLES[tc.priority]}`}>
                         {tc.priority}
                       </span>
-                      <select
-                        value={tc.status}
-                        onChange={(e) => handleStatusChange(tc.id, e.target.value)}
-                        className={`badge text-[10px] cursor-pointer border-0 appearance-none pr-5 ${STATUS_STYLES[tc.status]}`}
-                        style={{ backgroundImage: 'none' }}
-                      >
-                        {Object.keys(STATUS_STYLES).map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                      <span className={`badge text-[10px] ${STATUS_STYLES[tc.status]}`}>
+                        {tc.status}
+                      </span>
                     </div>
                     <p className="text-sm text-gray-500 mt-1.5 whitespace-pre-wrap font-mono text-xs leading-relaxed">
                       {tc.content}
@@ -456,12 +548,22 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => handleDeleteTestCase(tc.id)}
-                  className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                >
-                  <Trash2 size={14} />
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => openEdit(tc)}
+                    className="p-1.5 text-gray-300 hover:text-brand-500 hover:bg-brand-50 rounded-lg transition-colors"
+                    title="Edit test case"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTestCase(tc.id)}
+                    className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Delete test case"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
