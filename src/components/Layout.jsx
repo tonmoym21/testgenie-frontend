@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Beaker, FolderOpen, LogOut, Play, BarChart3 } from 'lucide-react';
+import { Beaker, FolderOpen, LogOut, Play, BarChart3, Zap } from 'lucide-react';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -12,9 +12,10 @@ export default function Layout({ children }) {
     navigate('/login');
   };
 
-  const navItems = [
+ const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
     { path: '/projects', label: 'Projects', icon: FolderOpen },
+    { path: '/run-test', label: 'Run Test', icon: Zap },
     { path: '/executions', label: 'Executions', icon: Play },
   ];
 

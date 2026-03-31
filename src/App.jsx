@@ -7,6 +7,7 @@ import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import ExecutionsPage from './pages/ExecutionsPage';
 import ExecutionDetailPage from './pages/ExecutionDetailPage';
+import RunTestPage from './pages/RunTestPage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -27,6 +28,7 @@ export default function App() {
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId" element={<ProtectedRoute><ProjectDetailPage /></ProtectedRoute>} />
+      <Route path="/run-test" element={<ProtectedRoute><RunTestPage /></ProtectedRoute>} />
       <Route path="/executions" element={<ProtectedRoute><ExecutionsPage /></ProtectedRoute>} />
       <Route path="/executions/:executionId" element={<ProtectedRoute><ExecutionDetailPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
