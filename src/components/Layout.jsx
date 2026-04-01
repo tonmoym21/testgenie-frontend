@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Beaker, FolderOpen, LogOut, Play, BarChart3, Zap } from 'lucide-react';
+import { Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings, Clock } from 'lucide-react';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -12,11 +12,14 @@ export default function Layout({ children }) {
     navigate('/login');
   };
 
- const navItems = [
+  const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
     { path: '/projects', label: 'Projects', icon: FolderOpen },
     { path: '/run-test', label: 'Run Test', icon: Zap },
+    { path: '/collections', label: 'Collections', icon: Library },
+    { path: '/schedules', label: 'Schedules', icon: Clock },
     { path: '/executions', label: 'Executions', icon: Play },
+    { path: '/environments', label: 'Environments', icon: Settings },
   ];
 
   return (
@@ -29,7 +32,7 @@ export default function Layout({ children }) {
             </div>
             <div>
               <span className="font-semibold text-base tracking-tight">TestForge</span>
-              <span className="block text-[10px] text-brand-300 uppercase tracking-widest">Build. Run. Trust.</span>
+              <span className="block text-[10px] text-brand-300 uppercase tracking-widest">BUILD. RUN. TRUST.</span>
             </div>
           </Link>
         </div>
@@ -38,17 +41,8 @@ export default function Layout({ children }) {
           {navItems.map(({ path, label, icon: Icon }) => {
             const active = location.pathname === path || (path !== '/dashboard' && location.pathname.startsWith(path));
             return (
-              <Link
-                key={path}
-                to={path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                  active
-                    ? 'bg-brand-600 text-white'
-                    : 'text-brand-200 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <Icon size={18} />
-                {label}
+              <Link key={path} to={path} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${active ? 'bg-brand-600 text-white' : 'text-brand-200 hover:bg-white/10 hover:text-white'}`}>
+                <Icon size={18} />{label}
               </Link>
             );
           })}
@@ -56,19 +50,12 @@ export default function Layout({ children }) {
 
         <div className="p-3 border-t border-white/10">
           <div className="px-3 py-2 text-xs text-brand-300 truncate">{user?.email}</div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-brand-200 hover:bg-white/10 hover:text-white w-full transition-colors"
-          >
-            <LogOut size={18} />
-            Sign Out
+          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-brand-200 hover:bg-white/10 hover:text-white w-full transition-colors">
+            <LogOut size={18} />Sign Out
           </button>
         </div>
       </aside>
-
-      <main className="ml-64 flex-1 min-h-screen">
-        {children}
-      </main>
+      <main className="ml-64 flex-1 min-h-screen">{children}</main>
     </div>
   );
 }

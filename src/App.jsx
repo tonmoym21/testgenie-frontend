@@ -8,6 +8,10 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import ExecutionsPage from './pages/ExecutionsPage';
 import ExecutionDetailPage from './pages/ExecutionDetailPage';
 import RunTestPage from './pages/RunTestPage';
+import CollectionsPage from './pages/CollectionsPage';
+import CollectionDetailPage from './pages/CollectionDetailPage';
+import EnvironmentsPage from './pages/EnvironmentsPage';
+import SchedulesPage from './pages/SchedulesPage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -29,6 +33,10 @@ export default function App() {
       <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId" element={<ProtectedRoute><ProjectDetailPage /></ProtectedRoute>} />
       <Route path="/run-test" element={<ProtectedRoute><RunTestPage /></ProtectedRoute>} />
+      <Route path="/collections" element={<ProtectedRoute><CollectionsPage /></ProtectedRoute>} />
+      <Route path="/collections/:collectionId" element={<ProtectedRoute><CollectionDetailPage /></ProtectedRoute>} />
+      <Route path="/environments" element={<ProtectedRoute><EnvironmentsPage /></ProtectedRoute>} />
+      <Route path="/schedules" element={<ProtectedRoute><SchedulesPage /></ProtectedRoute>} />
       <Route path="/executions" element={<ProtectedRoute><ExecutionsPage /></ProtectedRoute>} />
       <Route path="/executions/:executionId" element={<ProtectedRoute><ExecutionDetailPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
