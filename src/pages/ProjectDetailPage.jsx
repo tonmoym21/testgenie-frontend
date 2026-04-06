@@ -3,8 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import {
   ArrowLeft, Plus, Loader2, Trash2, Pencil, Check, X, Zap,
-  ChevronDown, AlertTriangle, Search, Copy, Shield
+ChevronDown, AlertTriangle, Search, Copy, Shield
 } from 'lucide-react';
+import ExportCsvButton from '../components/ExportCsvButton';
 
 const PRIORITY_STYLES = {
   critical: 'bg-red-100 text-red-700',
@@ -206,7 +207,8 @@ export default function ProjectDetailPage() {
             <h1 className="text-2xl font-semibold">{project.name}</h1>
             {project.description && <p className="text-gray-500 text-sm mt-1">{project.description}</p>}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <ExportCsvButton projectId={projectId} disabled={testCases.length === 0} />
             <button
               onClick={() => setShowAnalyze(!showAnalyze)}
               disabled={testCases.length === 0}
