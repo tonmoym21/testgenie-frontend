@@ -21,7 +21,7 @@ export function ExportCsvButton({ projectId, selectedTestCaseIds = null, disable
     setSuccess(false);
 
     try {
-      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+      const token = localStorage.getItem('accessToken');
       if (!token) {
         setError('Authentication required. Please log in.');
         setIsLoading(false);
@@ -39,8 +39,11 @@ export function ExportCsvButton({ projectId, selectedTestCaseIds = null, disable
           ? { testCaseIds: selectedTestCaseIds }
           : {};
 
+      const API_BASE = window.location.hostname === 'localhost'
+        ? '/api'
+        : 'https://testgenie-backend-production.up.railway.app/api';
       const response = await fetch(
-        `/api/projects/${encodeURIComponent(projectId)}/testcases/export-csv`,
+        `${API_BASE}/projects/${encodeURIComponent(projectId)}/testcases/export-csv`,
         {
           method: 'POST',
           headers: {
