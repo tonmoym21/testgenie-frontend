@@ -21,7 +21,7 @@ const RUN_STATUS_BADGE = {
 };
 
 export default function AutomationPage() {
-  const { projectId } = useParams();
+  const { projectId: urlProjectId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,8 +32,35 @@ export default function AutomationPage() {
   const [pagination, setPagination] = useState({ page: 1, total: 0 });
   const [runningIds, setRunningIds] = useState(new Set());
 
+  // Project selection (for global /automation route)
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState(urlProjectId || '');
+  const projectId = urlProjectId || selectedProjectId;
+
+  // Load projects if no projectId in URL
+  useEffect(() => {
+    if (urlProjectId) return;
+    const loadProjects = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL || 'https://testgenie-backend-production.up.railway.app'}/api/projects`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setProjects(data);
+          if (data.length > 0 && !selectedProjectId) {
+            setSelectedProjectId(String(data[0].id));
+          }
+        }
+      } catch (err) { console.error(err); }
+    };
+    loadProjects();
+  }, [urlProjectId]);
+
   const load = useCallback(async () => {
-    if (!projectId) return;
+    if (!projectId) { setLoading(false); return; }
     setLoading(true);
     try {
       const params = { page: pagination.page, limit: 20 };
@@ -72,7 +99,7 @@ export default function AutomationPage() {
     setRunningIds(prev => new Set(prev).add(assetId));
     try {
       await api.runAutomationAsset(projectId, assetId, { browser: 'chromium' });
-      setTimeout(load, 2000); // refresh after a bit
+      setTimeout(load, 2000);
     } catch (err) {
       alert('Run failed: ' + err.message);
     } finally {
@@ -107,6 +134,20 @@ export default function AutomationPage() {
           </button>
         )}
       </div>
+
+      {/* Project selector (shown on global /automation route) */}
+      {!urlProjectId && (
+        <div className="mb-5">
+          <select
+            value={selectedProjectId}
+            onChange={(e) => { setSelectedProjectId(e.target.value); setPagination(p => ({ ...p, page: 1 })); }}
+            className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="">Select a project</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-3 mb-5 flex-wrap">

@@ -33,6 +33,8 @@ function PublicRoute({ children }) {
 export default function App() {
   return (
     <Routes>
+      <Route path="/automation" element={<ProtectedRoute><AutomationPage /></ProtectedRoute>} />
+      <Route path="/automation" element={<ProtectedRoute><AutomationPage /></ProtectedRoute>} />
       <Route path="/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/stories/new" element={<ProtectedRoute><CreateStoryPage /></ProtectedRoute>} />
