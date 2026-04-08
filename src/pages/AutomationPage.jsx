@@ -42,18 +42,11 @@ export default function AutomationPage() {
     if (urlProjectId) return;
     const loadProjects = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL || 'https://testgenie-backend-production.up.railway.app'}/api/projects`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          const list = Array.isArray(data) ? data : data.data || data.projects || [];
-setProjects(list);
-          if (list.length > 0 && !selectedProjectId) {
-            setSelectedProjectId(String(list[0].id));
-          }
+    const data = await api.getProjects();
+        const list = Array.isArray(data) ? data : data.data || data.projects || [];
+        setProjects(list);
+        if (list.length > 0 && !selectedProjectId) {
+          setSelectedProjectId(String(list[0].id));
         }
       } catch (err) { console.error(err); }
     };
