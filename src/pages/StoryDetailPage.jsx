@@ -90,7 +90,7 @@ export default function StoryDetailPage() {
           disabled: !canExport || exporting,
           onClick: handleExport
         }, exporting ? 'Exporting...' : '\u2B07 Export CSV (' + approvedCount + ')'),
-        React.createElement(GeneratePlaywrightButton, { projectId: projectId, storyIngestionId: storyId })
+        React.createElement(GeneratePlaywrightButton, { projectId: projectId, storyIngestionId: storyId, storyTitle: story.title })
       )
     ),
 
@@ -179,7 +179,6 @@ function ScenarioCard(scenario, onStatusChange) {
         }, '\u21BA')
       )
     ),
-    // Details section
     React.createElement('div', { style: { marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f3f4f6', fontSize: '13px', color: '#374151' } },
       s.test_intent && React.createElement('div', { style: { marginBottom: '6px' } }, React.createElement('strong', null, 'Test Intent: '), s.test_intent),
       preconditions.length > 0 && React.createElement('div', { style: { marginBottom: '6px' } },

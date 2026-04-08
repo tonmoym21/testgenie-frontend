@@ -15,6 +15,8 @@ import CollectionsPage from './pages/CollectionsPage';
 import CollectionDetailPage from './pages/CollectionDetailPage';
 import EnvironmentsPage from './pages/EnvironmentsPage';
 import SchedulesPage from './pages/SchedulesPage';
+import AutomationPage from './pages/AutomationPage';
+import AutomationAssetDetailPage from './pages/AutomationAssetDetailPage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -35,6 +37,8 @@ export default function App() {
       <Route path="/projects/:projectId/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/stories/new" element={<ProtectedRoute><CreateStoryPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/stories/:storyId" element={<ProtectedRoute><StoryDetailPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/automation" element={<ProtectedRoute><AutomationPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/automation/:assetId" element={<ProtectedRoute><AutomationAssetDetailPage /></ProtectedRoute>} />
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />

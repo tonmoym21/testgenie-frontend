@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings, Clock, BookOpen } from 'lucide-react';
+import { Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings, Clock, BookOpen, Bot } from 'lucide-react';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -47,6 +47,20 @@ export default function Layout({ children }) {
               </Link>
             );
           })}
+
+          {/* Automation is project-scoped; show if we're in a project context */}
+          {location.pathname.match(/\/projects\/\d+/) && (() => {
+            const match = location.pathname.match(/\/projects\/(\d+)/);
+            const pid = match ? match[1] : null;
+            if (!pid) return null;
+            const autoPath = `/projects/${pid}/automation`;
+            const active = location.pathname.startsWith(autoPath);
+            return (
+              <Link to={autoPath} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${active ? 'bg-brand-600 text-white' : 'text-brand-200 hover:bg-white/10 hover:text-white'}`}>
+                <Bot size={18} />Automation
+              </Link>
+            );
+          })()}
         </nav>
 
         <div className="p-3 border-t border-white/10">
