@@ -49,9 +49,10 @@ export default function AutomationPage() {
         );
         if (res.ok) {
           const data = await res.json();
-          setProjects(data);
-          if (data.length > 0 && !selectedProjectId) {
-            setSelectedProjectId(String(data[0].id));
+          const list = Array.isArray(data) ? data : data.data || data.projects || [];
+setProjects(list);
+          if (list.length > 0 && !selectedProjectId) {
+            setSelectedProjectId(String(list[0].id));
           }
         }
       } catch (err) { console.error(err); }
