@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import {
   ArrowLeft, Plus, Loader2, Trash2, Pencil, Check, X, Zap,
-ChevronDown, AlertTriangle, Search, Copy, Shield
+ChevronDown, AlertTriangle, Search, Copy, Shield, BookOpen
 } from 'lucide-react';
 import ExportCsvButton from '../components/ExportCsvButton';
 
@@ -208,6 +208,13 @@ export default function ProjectDetailPage() {
             {project.description && <p className="text-gray-500 text-sm mt-1">{project.description}</p>}
           </div>
           <div className="flex gap-2 items-center">
+            <Link
+              to={`/projects/${projectId}/stories`}
+              className="btn-secondary inline-flex items-center gap-1.5"
+            >
+              <BookOpen size={16} />
+              Stories
+            </Link>
             <ExportCsvButton projectId={projectId} disabled={testCases.length === 0} />
             <button
               onClick={() => setShowAnalyze(!showAnalyze)}
