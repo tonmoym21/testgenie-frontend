@@ -1,3 +1,6 @@
+import StoriesPage from './pages/StoriesPage';
+import CreateStoryPage from './pages/CreateStoryPage';
+import StoryDetailPage from './pages/StoryDetailPage';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
@@ -28,6 +31,10 @@ function PublicRoute({ children }) {
 export default function App() {
   return (
     <Routes>
+      <Route path="/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/stories/new" element={<ProtectedRoute><CreateStoryPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/stories/:storyId" element={<ProtectedRoute><StoryDetailPage /></ProtectedRoute>} />
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />

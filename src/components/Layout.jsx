@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings, Clock } from 'lucide-react';
+import { Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings, Clock, BookOpen } from 'lucide-react';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -19,6 +19,7 @@ export default function Layout({ children }) {
     { path: '/collections', label: 'Collections', icon: Library },
     { path: '/schedules', label: 'Schedules', icon: Clock },
     { path: '/executions', label: 'Executions', icon: Play },
+    { path: '/stories', label: 'Stories', icon: BookOpen },
     { path: '/environments', label: 'Environments', icon: Settings },
   ];
 
