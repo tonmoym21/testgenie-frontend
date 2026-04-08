@@ -1,3 +1,4 @@
+import GeneratePlaywrightButton from '../components/GeneratePlaywrightButton';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getStory, listScenarios, updateScenarioStatus, getCoverage, exportStoryCsv } from '../services/storyApi';
@@ -83,11 +84,14 @@ export default function StoryDetailPage() {
         StatBox('Rejected', rejectedCount, '#dc2626'),
         coverage && StatBox('Quality', coverage.qualityScore + '%', '#7c3aed')
       ),
-      React.createElement('button', {
-        style: { backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 18px', fontSize: '14px', fontWeight: '600', opacity: canExport && !exporting ? 1 : 0.5, cursor: canExport && !exporting ? 'pointer' : 'not-allowed' },
-        disabled: !canExport || exporting,
-        onClick: handleExport
-      }, exporting ? 'Exporting...' : '\u2B07 Export CSV (' + approvedCount + ')')
+      React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+        React.createElement('button', {
+          style: { backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 18px', fontSize: '14px', fontWeight: '600', opacity: canExport && !exporting ? 1 : 0.5, cursor: canExport && !exporting ? 'pointer' : 'not-allowed' },
+          disabled: !canExport || exporting,
+          onClick: handleExport
+        }, exporting ? 'Exporting...' : '\u2B07 Export CSV (' + approvedCount + ')'),
+        React.createElement(GeneratePlaywrightButton, { projectId: projectId, storyIngestionId: storyId })
+      )
     ),
 
     // Export message
