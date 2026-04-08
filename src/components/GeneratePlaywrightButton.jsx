@@ -1,8 +1,6 @@
 // frontend/components/GeneratePlaywrightButton.jsx
-// Button + modal for generating Playwright tests from approved scenarios
-// Place next to your existing ExportCsvButton on the Story Detail page
-
 import React, { useState } from 'react';
+import { getApiErrorMessage } from '../utils/apiErrors';
 
 const API_BASE =
   window.location.hostname === 'localhost'
@@ -55,8 +53,8 @@ export default function GeneratePlaywrightButton({ projectId, storyIngestionId }
       );
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Generation failed (${res.status})`);
+        const body = await res.json().catch(() => ({}));
+        throw new Error(getApiErrorMessage(body, res.status));
       }
 
       const data = await res.json();
@@ -70,30 +68,39 @@ export default function GeneratePlaywrightButton({ projectId, storyIngestionId }
 
   const handleDownload = async () => {
     if (!result?.id) return;
+    setError(null);
 
-    const token = localStorage.getItem('accessToken');
-    const res = await fetch(
-      `${API_BASE}/api/projects/${projectId}/playwright/${result.id}/download`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(
+        `${API_BASE}/api/projects/${projectId}/playwright/${result.id}/download`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-    if (!res.ok) {
-      setError('Download failed');
-      return;
+      // If server returns JSON error even on download endpoint
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok) {
+        if (contentType.includes('application/json')) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(getApiErrorMessage(body, res.status));
+        }
+        throw new Error(`Download failed (${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.zipFileName || 'playwright-tests.zip';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message);
     }
-
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = result.zipFileName || 'playwright-tests.zip';
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   return (
     <>
-      {/* Trigger button */}
       <button
         onClick={() => { setShowModal(true); setResult(null); setError(null); }}
         className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-emerald-700 transition-colors"
@@ -104,7 +111,6 @@ export default function GeneratePlaywrightButton({ projectId, storyIngestionId }
         Generate Playwright Tests
       </button>
 
-      {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
@@ -115,7 +121,6 @@ export default function GeneratePlaywrightButton({ projectId, storyIngestionId }
               Select category tags for the generated test suite.
             </p>
 
-            {/* Category tags */}
             <div className="flex flex-wrap gap-2 mb-5">
               {CATEGORY_OPTIONS.map((cat) => {
                 const active = selected.includes(cat.value);
@@ -135,14 +140,12 @@ export default function GeneratePlaywrightButton({ projectId, storyIngestionId }
               })}
             </div>
 
-            {/* Error */}
             {error && (
               <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
                 {error}
               </div>
             )}
 
-            {/* Success result */}
             {result && (
               <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800">
                 <p className="font-medium mb-1">Generation complete</p>
@@ -162,7 +165,6 @@ export default function GeneratePlaywrightButton({ projectId, storyIngestionId }
               </div>
             )}
 
-            {/* Actions */}
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowModal(false)}
