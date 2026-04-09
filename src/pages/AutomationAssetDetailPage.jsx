@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { ArrowLeft, Loader2, Play, CheckCircle, XCircle, Clock, Tag, FileCode, Settings2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Play, CheckCircle, XCircle, Clock, Tag, FileCode, ShieldCheck, AlertTriangle, RefreshCw } from 'lucide-react';
 
 const ALL_CATEGORIES = ['smoke', 'sanity', 'regression', 'e2e', 'critical_path', 'ui', 'api', 'p0', 'p1', 'p2'];
 
@@ -13,27 +13,38 @@ const RUN_STATUS_BADGE = {
   cancelled: 'bg-yellow-100 text-yellow-700',
 };
 
+const READINESS_BADGE = {
+  draft: 'bg-gray-100 text-gray-500',
+  needs_selector_mapping: 'bg-yellow-100 text-yellow-700',
+  ready: 'bg-blue-100 text-blue-700',
+  validated: 'bg-green-100 text-green-700',
+};
+
 export default function AutomationAssetDetailPage() {
   const { projectId, assetId } = useParams();
   const [asset, setAsset] = useState(null);
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [runLoading, setRunLoading] = useState(false);
-  const [baseUrl, setBaseUrl] = useState('');
+  const [verifyLoading, setVerifyLoading] = useState(false);
   const [editingCats, setEditingCats] = useState(false);
   const [cats, setCats] = useState([]);
   const [selectedRun, setSelectedRun] = useState(null);
+  const [readiness, setReadiness] = useState(null); // latest validation
+  const [preflight, setPreflight] = useState(null); // last preflight result
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [a, r] = await Promise.all([
+      const [a, r, rd] = await Promise.all([
         api.getAutomationAsset(projectId, assetId),
         api.getAutomationRuns(projectId, assetId, { limit: 20 }),
+        api.getReadiness(projectId, assetId).catch(() => null),
       ]);
       setAsset(a);
       setCats(a.categories || []);
       setRuns(r.data);
+      if (rd) setReadiness(rd);
     } catch (err) {
       console.error(err);
     } finally {
@@ -50,7 +61,6 @@ export default function AutomationAssetDetailPage() {
       try {
         const r = await api.getAutomationRuns(projectId, assetId, { limit: 20 });
         setRuns(r.data);
-        // Also refresh asset for last_run_status
         const a = await api.getAutomationAsset(projectId, assetId);
         setAsset(a);
       } catch {}
@@ -58,16 +68,41 @@ export default function AutomationAssetDetailPage() {
     return () => clearInterval(interval);
   }, [runs, projectId, assetId]);
 
+  const handleVerifyReadiness = async () => {
+    setVerifyLoading(true);
+    setPreflight(null);
+    try {
+      const result = await api.verifyReadiness(projectId, assetId);
+      setReadiness({ validation: result.validation, executionReadiness: result.validation.validation_status === 'passed' ? 'validated' : asset.execution_readiness });
+      setPreflight(result.preflight);
+      // Refresh asset for updated execution_readiness
+      const a = await api.getAutomationAsset(projectId, assetId);
+      setAsset(a);
+    } catch (err) {
+      alert('Verification failed: ' + err.message);
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
+
+  const isExecutionReady = asset?.execution_readiness === 'validated' || readiness?.validation?.validation_status === 'passed';
+
   const handleRun = async () => {
-    const url = baseUrl.trim() || prompt('Enter the target app URL (e.g. https://myapp.com):');
-    if (!url) return;
-    setBaseUrl(url);
+    if (!isExecutionReady) {
+      alert('Please verify readiness before running.');
+      return;
+    }
     setRunLoading(true);
     try {
-      await api.runAutomationAsset(projectId, assetId, { browser: 'chromium', baseUrl: url });
+      await api.runAutomationAsset(projectId, assetId, { browser: 'chromium' });
       setTimeout(load, 1500);
     } catch (err) {
-      alert('Run failed: ' + err.message);
+      if (err.code === 'PREFLIGHT_FAILED') {
+        setPreflight(err.preflight);
+        alert('Readiness check failed. Fix blockers before running.');
+      } else {
+        alert('Run failed: ' + err.message);
+      }
     } finally {
       setRunLoading(false);
     }
@@ -78,20 +113,20 @@ export default function AutomationAssetDetailPage() {
       await api.updateAutomationAsset(projectId, assetId, { categories: cats });
       setEditingCats(false);
       load();
-    } catch (err) {
-      alert(err.message);
-    }
+    } catch (err) { alert(err.message); }
   };
 
-  const toggleCat = (c) => {
-    setCats(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
-  };
+  const toggleCat = (c) => setCats(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
 
   if (loading) return <div className="flex justify-center py-32"><Loader2 size={24} className="animate-spin text-brand-600" /></div>;
   if (!asset) return <div className="p-8 text-center text-gray-500">Asset not found</div>;
 
   const manifest = typeof asset.generated_files_manifest === 'string'
     ? JSON.parse(asset.generated_files_manifest) : asset.generated_files_manifest || [];
+
+  const validation = readiness?.validation;
+  const checks = validation ? (typeof validation.checks === 'string' ? JSON.parse(validation.checks) : validation.checks || []) : [];
+  const blockers = validation ? (typeof validation.failure_reasons === 'string' ? JSON.parse(validation.failure_reasons) : validation.failure_reasons || []) : [];
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
@@ -109,19 +144,71 @@ export default function AutomationAssetDetailPage() {
               <span>{manifest.length} test files</span>
               <span>{asset.framework} / {asset.language}</span>
               <span>Created {new Date(asset.created_at).toLocaleDateString()}</span>
+              <span className={`px-2 py-0.5 rounded-full font-medium ${READINESS_BADGE[asset.execution_readiness] || READINESS_BADGE.draft}`}>
+                {asset.execution_readiness}
+              </span>
             </div>
           </div>
           <div className="flex gap-2">
             <button
+              onClick={handleVerifyReadiness}
+              disabled={verifyLoading}
+              className="inline-flex items-center gap-2 rounded-lg border border-brand-300 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+            >
+              {verifyLoading ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+              Verify Readiness
+            </button>
+            <button
               onClick={handleRun}
-              disabled={runLoading}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              disabled={runLoading || !isExecutionReady}
+              title={!isExecutionReady ? 'Verify readiness first' : 'Run tests'}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {runLoading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
               Run Now
             </button>
           </div>
         </div>
+
+        {/* Readiness Checklist */}
+        {(checks.length > 0 || blockers.length > 0 || preflight) && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldCheck size={14} className="text-gray-400" />
+              <span className="text-xs font-medium text-gray-500 uppercase">Readiness Checklist</span>
+              {validation && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ml-auto ${
+                  validation.validation_status === 'passed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                }`}>
+                  {validation.validation_status === 'passed' ? 'Ready' : 'Blocked'}
+                </span>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              {(preflight?.checks || checks).map((c, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs">
+                  <CheckCircle size={12} className="text-green-500 shrink-0" />
+                  <span className="text-gray-600">{c.name?.replace(/_/g, ' ')}</span>
+                  <span className="text-gray-400 ml-auto">{c.detail}</span>
+                </div>
+              ))}
+              {(preflight?.blockers || blockers).map((b, i) => (
+                <div key={`b-${i}`} className="flex items-start gap-2 text-xs">
+                  {b.status === 'fail'
+                    ? <XCircle size={12} className="text-red-500 shrink-0 mt-0.5" />
+                    : <AlertTriangle size={12} className="text-yellow-500 shrink-0 mt-0.5" />}
+                  <div>
+                    <span className="text-gray-700 font-medium">{b.name?.replace(/_/g, ' ')}</span>
+                    <span className="text-gray-500 ml-1">{b.detail}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {validation?.verified_at && (
+              <p className="text-[10px] text-gray-400 mt-2">Last verified: {new Date(validation.verified_at).toLocaleString()}</p>
+            )}
+          </div>
+        )}
 
         {/* Categories */}
         <div className="mt-4 pt-4 border-t border-gray-100">
@@ -136,29 +223,18 @@ export default function AutomationAssetDetailPage() {
             <div>
               <div className="flex flex-wrap gap-2 mb-3">
                 {ALL_CATEGORIES.map(c => (
-                  <button
-                    key={c}
-                    onClick={() => toggleCat(c)}
-                    className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
-                      cats.includes(c)
-                        ? 'bg-brand-50 text-brand-700 border-brand-300 ring-1 ring-brand-200'
-                        : 'bg-gray-50 text-gray-400 border-gray-200'
-                    }`}
+                  <button key={c} onClick={() => toggleCat(c)}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-all ${cats.includes(c) ? 'bg-brand-50 text-brand-700 border-brand-300 ring-1 ring-brand-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}
                   >{c}</button>
                 ))}
               </div>
-              <button onClick={handleSaveCats} className="text-xs bg-brand-600 text-white px-3 py-1.5 rounded-lg hover:bg-brand-700">
-                Save Categories
-              </button>
+              <button onClick={handleSaveCats} className="text-xs bg-brand-600 text-white px-3 py-1.5 rounded-lg hover:bg-brand-700">Save Categories</button>
             </div>
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {(asset.categories || []).length > 0
-                ? asset.categories.map(c => (
-                    <span key={c} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{c}</span>
-                  ))
-                : <span className="text-xs text-gray-300">No categories assigned</span>
-              }
+                ? asset.categories.map(c => <span key={c} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{c}</span>)
+                : <span className="text-xs text-gray-300">No categories assigned</span>}
             </div>
           )}
         </div>
@@ -172,9 +248,7 @@ export default function AutomationAssetDetailPage() {
             </div>
             <div className="space-y-1">
               {manifest.map((f, i) => (
-                <div key={i} className="text-xs text-gray-600 font-mono bg-gray-50 rounded px-2 py-1">
-                  tests/{f.fileName || f}
-                </div>
+                <div key={i} className="text-xs text-gray-600 font-mono bg-gray-50 rounded px-2 py-1">tests/{f.fileName || f}</div>
               ))}
             </div>
           </div>
@@ -186,16 +260,13 @@ export default function AutomationAssetDetailPage() {
       {runs.length === 0 ? (
         <div className="card p-8 text-center">
           <Clock size={36} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-400 text-sm">No runs yet. Click "Run Now" to execute.</p>
+          <p className="text-gray-400 text-sm">No runs yet. Verify readiness, then click "Run Now".</p>
         </div>
       ) : (
         <div className="space-y-2">
           {runs.map((run) => (
-            <div
-              key={run.id}
-              onClick={() => setSelectedRun(selectedRun?.id === run.id ? null : run)}
-              className="card p-4 cursor-pointer hover:border-brand-300 hover:shadow-md transition-all"
-            >
+            <div key={run.id} onClick={() => setSelectedRun(selectedRun?.id === run.id ? null : run)}
+              className="card p-4 cursor-pointer hover:border-brand-300 hover:shadow-md transition-all">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {run.status === 'passed' ? <CheckCircle size={16} className="text-green-500" /> :
@@ -204,18 +275,15 @@ export default function AutomationAssetDetailPage() {
                   <div>
                     <span className="text-sm font-medium">Run #{run.id}</span>
                     <span className="text-xs text-gray-400 ml-3">{new Date(run.created_at).toLocaleString()}</span>
+                    {run.run_type === 'bulk' && <span className="text-[10px] ml-2 px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded">bulk</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   {run.duration_ms && <span className="text-xs text-gray-400">{(run.duration_ms / 1000).toFixed(1)}s</span>}
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${RUN_STATUS_BADGE[run.status] || ''}`}>
-                    {run.status}
-                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${RUN_STATUS_BADGE[run.status] || ''}`}>{run.status}</span>
                 </div>
               </div>
-
-              {/* Stats row */}
-              {(run.total_tests > 0) && (
+              {run.total_tests > 0 && (
                 <div className="flex gap-4 mt-2 text-xs text-gray-500">
                   <span className="text-green-600">{run.passed_tests} passed</span>
                   <span className="text-red-600">{run.failed_tests} failed</span>
@@ -223,21 +291,15 @@ export default function AutomationAssetDetailPage() {
                   <span>Total: {run.total_tests}</span>
                 </div>
               )}
-
-              {/* Expanded detail */}
               {selectedRun?.id === run.id && (
                 <div className="mt-3 pt-3 border-t border-gray-100">
                   {run.error_summary && (
-                    <div className="mb-3 bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg border border-red-200">
-                      {run.error_summary}
-                    </div>
+                    <div className="mb-3 bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg border border-red-200">{run.error_summary}</div>
                   )}
                   {run.output_logs && (
                     <div>
                       <h4 className="text-xs font-medium text-gray-500 mb-1">Output Logs</h4>
-                      <pre className="text-[11px] font-mono bg-gray-900 text-gray-100 rounded-lg p-3 max-h-64 overflow-auto whitespace-pre-wrap">
-                        {run.output_logs}
-                      </pre>
+                      <pre className="text-[11px] font-mono bg-gray-900 text-gray-100 rounded-lg p-3 max-h-64 overflow-auto whitespace-pre-wrap">{run.output_logs}</pre>
                     </div>
                   )}
                 </div>
