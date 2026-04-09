@@ -19,6 +19,7 @@ export default function AutomationAssetDetailPage() {
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [runLoading, setRunLoading] = useState(false);
+  const [baseUrl, setBaseUrl] = useState('');
   const [editingCats, setEditingCats] = useState(false);
   const [cats, setCats] = useState([]);
   const [selectedRun, setSelectedRun] = useState(null);
@@ -58,9 +59,12 @@ export default function AutomationAssetDetailPage() {
   }, [runs, projectId, assetId]);
 
   const handleRun = async () => {
+    const url = baseUrl.trim() || prompt('Enter the target app URL (e.g. https://myapp.com):');
+    if (!url) return;
+    setBaseUrl(url);
     setRunLoading(true);
     try {
-      await api.runAutomationAsset(projectId, assetId, { browser: 'chromium' });
+      await api.runAutomationAsset(projectId, assetId, { browser: 'chromium', baseUrl: url });
       setTimeout(load, 1500);
     } catch (err) {
       alert('Run failed: ' + err.message);
