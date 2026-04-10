@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { ArrowLeft, Loader2, Play, CheckCircle, XCircle, Clock, Tag, FileCode, ShieldCheck, AlertTriangle, Settings2, Save, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Loader2, Play, CheckCircle, XCircle, Clock, Tag, FileCode, ShieldCheck, AlertTriangle, Settings2, Save, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
 
 const ALL_CATEGORIES = ['smoke', 'sanity', 'regression', 'e2e', 'critical_path', 'ui', 'api', 'p0', 'p1', 'p2'];
 const RUN_STATUS_BADGE = { passed: 'bg-green-100 text-green-700', failed: 'bg-red-100 text-red-700', running: 'bg-blue-100 text-blue-700 animate-pulse', queued: 'bg-gray-100 text-gray-600', cancelled: 'bg-yellow-100 text-yellow-700' };
@@ -15,6 +15,22 @@ const AUTH_TYPES = [
   { value: 'basic_auth', label: 'HTTP Basic Auth' },
 ];
 
+const ENV_VAR_PATTERN = /^[A-Z][A-Z0-9_]{1,127}$/;
+
+function isValidEnvVar(val) {
+  if (!val) return true; // empty is OK (field is optional)
+  return ENV_VAR_PATTERN.test(val.trim());
+}
+
+// Default selector map keys for login flow
+const DEFAULT_SELECTOR_KEYS = [
+  { key: 'usernameField', label: 'Username / Email Field', placeholder: "getByLabel('Email') or getByPlaceholder('Enter email')" },
+  { key: 'passwordField', label: 'Password Field', placeholder: "getByLabel('Password')" },
+  { key: 'loginButton', label: 'Login / Submit Button', placeholder: "getByRole('button', { name: 'Sign in' })" },
+  { key: 'successIndicator', label: 'Post-Login Success Element', placeholder: "getByRole('heading', { name: 'Dashboard' })" },
+  { key: 'errorIndicator', label: 'Error Message Element (optional)', placeholder: "getByRole('alert') or getByText('Invalid credentials')" },
+];
+
 // ---------------------------------------------------------------------------
 // Prerequisites Setup Panel (inline)
 // ---------------------------------------------------------------------------
@@ -25,11 +41,14 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
   const [configs, setConfigs] = useState([]);
   const [selectedConfigId, setSelectedConfigId] = useState(asset.target_app_config_id || '');
   const [showNew, setShowNew] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [selectorMapOpen, setSelectorMapOpen] = useState(false);
 
   const [form, setForm] = useState({
     name: 'Default', baseUrl: '', environment: 'staging', authType: 'none',
-    loginUrl: '', authUsernameEnv: 'TEST_USERNAME', authPasswordEnv: 'TEST_PASSWORD',
-    authTokenEnv: 'TEST_AUTH_TOKEN', selectorStrategy: 'role_first', knownTestids: '', isDefault: true,
+    loginUrl: '', authUsernameEnv: '', authPasswordEnv: '',
+    authTokenEnv: '', selectorStrategy: 'role_first', knownTestids: '',
+    selectorMap: {}, isDefault: true,
   });
 
   useEffect(() => {
@@ -39,7 +58,6 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
       try {
         const list = await api.request('GET', `/projects/${projectId}/target-app`);
         setConfigs(Array.isArray(list) ? list : []);
-        // If asset already linked, select it
         if (asset.target_app_config_id) {
           setSelectedConfigId(asset.target_app_config_id);
           const existing = (Array.isArray(list) ? list : []).find(c => c.id === asset.target_app_config_id);
@@ -55,14 +73,30 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
     })();
   }, [open, projectId]);
 
+  function parseSelectorMap(raw) {
+    if (!raw) return {};
+    if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return {}; } }
+    return raw;
+  }
+
+  function parseKnownTestids(raw) {
+    if (!raw) return '';
+    if (typeof raw === 'string') { try { return JSON.parse(raw).join(', '); } catch { return raw; } }
+    if (Array.isArray(raw)) return raw.join(', ');
+    return '';
+  }
+
   function populateForm(cfg) {
     setForm({
       name: cfg.name || 'Default', baseUrl: cfg.base_url || '', environment: cfg.environment || 'staging',
       authType: cfg.auth_type || 'none', loginUrl: cfg.login_url || '',
-      authUsernameEnv: cfg.auth_username_env || 'TEST_USERNAME', authPasswordEnv: cfg.auth_password_env || 'TEST_PASSWORD',
-      authTokenEnv: cfg.auth_token_env || 'TEST_AUTH_TOKEN', selectorStrategy: cfg.selector_strategy || 'role_first',
-      knownTestids: (cfg.known_testids || []).join(', '), isDefault: cfg.is_default !== false,
+      authUsernameEnv: cfg.auth_username_env || '', authPasswordEnv: cfg.auth_password_env || '',
+      authTokenEnv: cfg.auth_token_env || '', selectorStrategy: cfg.selector_strategy || 'role_first',
+      knownTestids: parseKnownTestids(cfg.known_testids),
+      selectorMap: parseSelectorMap(cfg.selector_map),
+      isDefault: cfg.is_default !== false,
     });
+    setErrors({});
   }
 
   const handleSelectConfig = (id) => {
@@ -72,49 +106,80 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
     if (cfg) populateForm(cfg);
   };
 
+  function validate() {
+    const e = {};
+    if (!form.baseUrl) e.baseUrl = 'Required';
+    if ((form.authType === 'form_login' || form.authType === 'basic_auth')) {
+      if (form.authUsernameEnv && !isValidEnvVar(form.authUsernameEnv)) {
+        e.authUsernameEnv = 'Must be UPPER_SNAKE_CASE (e.g. TEST_USERNAME), not a raw credential';
+      }
+      if (form.authPasswordEnv && !isValidEnvVar(form.authPasswordEnv)) {
+        e.authPasswordEnv = 'Must be UPPER_SNAKE_CASE (e.g. TEST_PASSWORD), not a raw secret';
+      }
+    }
+    if (form.authType === 'token' && form.authTokenEnv && !isValidEnvVar(form.authTokenEnv)) {
+      e.authTokenEnv = 'Must be UPPER_SNAKE_CASE (e.g. AUTH_TOKEN)';
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   const handleSave = async () => {
+    if (!validate()) return;
     setSaving(true);
     try {
-      const payload = {
-        name: form.name, baseUrl: form.baseUrl, environment: form.environment,
-        authType: form.authType, loginUrl: form.loginUrl || undefined,
-        authUsernameEnv: form.authUsernameEnv || undefined, authPasswordEnv: form.authPasswordEnv || undefined,
-        authTokenEnv: form.authTokenEnv || undefined, selectorStrategy: form.selectorStrategy,
-        knownTestids: form.knownTestids ? form.knownTestids.split(',').map(s => s.trim()).filter(Boolean) : [],
-        isDefault: form.isDefault,
-      };
+      const knownTestidsArr = form.knownTestids ? form.knownTestids.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const selectorMap = form.selectorMap || {};
 
       let saved;
       if (showNew || !selectedConfigId) {
-        saved = await api.request('POST', `/projects/${projectId}/target-app`, payload);
+        saved = await api.request('POST', `/projects/${projectId}/target-app`, {
+          name: form.name, baseUrl: form.baseUrl, environment: form.environment,
+          authType: form.authType, loginUrl: form.loginUrl || undefined,
+          authUsernameEnv: form.authUsernameEnv || undefined,
+          authPasswordEnv: form.authPasswordEnv || undefined,
+          authTokenEnv: form.authTokenEnv || undefined,
+          selectorStrategy: form.selectorStrategy,
+          selectorMap, knownTestids: knownTestidsArr, isDefault: form.isDefault,
+        });
       } else {
-        // Update existing — use snake_case keys for PATCH
-        const patchPayload = {
-          name: payload.name, base_url: payload.baseUrl, environment: payload.environment,
-          auth_type: payload.authType, login_url: payload.loginUrl,
-          auth_username_env: payload.authUsernameEnv, auth_password_env: payload.authPasswordEnv,
-          auth_token_env: payload.authTokenEnv, selector_strategy: payload.selectorStrategy,
-          known_testids: payload.knownTestids, is_default: payload.isDefault,
-        };
-        saved = await api.request('PATCH', `/projects/${projectId}/target-app/${selectedConfigId}`, patchPayload);
+        saved = await api.request('PATCH', `/projects/${projectId}/target-app/${selectedConfigId}`, {
+          name: form.name, base_url: form.baseUrl, environment: form.environment,
+          auth_type: form.authType, login_url: form.loginUrl || null,
+          auth_username_env: form.authUsernameEnv || null,
+          auth_password_env: form.authPasswordEnv || null,
+          auth_token_env: form.authTokenEnv || null,
+          selector_strategy: form.selectorStrategy,
+          selector_map: selectorMap, known_testids: knownTestidsArr,
+          is_default: form.isDefault,
+        });
       }
 
-      // Link config to asset
+      // Link config to the asset
       const configId = saved.id || selectedConfigId;
-      await api.updateAutomationAsset(projectId, asset.id, {}); // no-op but needed pattern
-      // Direct DB link via PATCH on asset isn't supported for target_app_config_id, so use raw request
-      await api.request('PATCH', `/projects/${projectId}/automation/assets/${asset.id}`, {});
-      // Actually need to link — let me update via backend directly
-      // The createAsset route supports targetAppConfigId, but update doesn't. Let's just call the config saved callback.
+      if (configId) {
+        await api.request('PATCH', `/projects/${projectId}/automation/assets/${asset.id}`, {
+          target_app_config_id: Number(configId),
+        });
+      }
 
       onSaved?.(configId);
     } catch (err) {
-      alert('Save failed: ' + err.message);
+      const msg = err.details
+        ? JSON.stringify(err.details)
+        : err.message;
+      alert('Save failed: ' + msg);
     } finally { setSaving(false); }
   };
 
-  const ch = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+  const ch = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
+  };
+  const chSelector = (key, value) => setForm(prev => ({ ...prev, selectorMap: { ...prev.selectorMap, [key]: value } }));
+
   const showAuthFields = form.authType !== 'none';
+  const hasErrors = Object.keys(errors).length > 0;
 
   return (
     <div className="mt-4 pt-4 border-t border-gray-100">
@@ -140,7 +205,7 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
                       {configs.map(c => <option key={c.id} value={c.id}>{c.name} — {c.base_url}</option>)}
                     </select>
                   </div>
-                  <button onClick={() => { setShowNew(true); setSelectedConfigId(''); setForm(f => ({ ...f, name: '', baseUrl: '' })); }}
+                  <button onClick={() => { setShowNew(true); setSelectedConfigId(''); setForm(f => ({ ...f, name: '', baseUrl: '', selectorMap: {} })); }}
                     className="text-xs text-brand-600 hover:underline whitespace-nowrap pb-2">+ New Config</button>
                 </div>
               )}
@@ -164,8 +229,9 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
 
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Base URL <span className="text-red-400">*</span></label>
-                <input className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                <input className={`w-full text-sm border rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none ${errors.baseUrl ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
                   placeholder="https://your-app.example.com" value={form.baseUrl} onChange={e => ch('baseUrl', e.target.value)} />
+                {errors.baseUrl && <p className="text-[10px] text-red-500 mt-0.5">{errors.baseUrl}</p>}
                 <p className="text-[10px] text-gray-400 mt-0.5">The URL Playwright tests will run against</p>
               </div>
 
@@ -181,7 +247,7 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
                   <label className="block text-xs text-gray-500 mb-1">Selector Strategy</label>
                   <select className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none"
                     value={form.selectorStrategy} onChange={e => ch('selectorStrategy', e.target.value)}>
-                    <option value="role_first">Role-first</option><option value="testid_first">TestId-first</option>
+                    <option value="role_first">Role-first (recommended)</option><option value="testid_first">TestId-first</option>
                     <option value="label_first">Label-first</option><option value="css_fallback">CSS fallback</option>
                   </select>
                 </div>
@@ -189,49 +255,87 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
 
               {showAuthFields && (
                 <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-3 space-y-2">
-                  <p className="text-[10px] text-yellow-700">Credentials are sourced from env vars — never stored in generated tests.</p>
+                  <p className="text-[10px] text-yellow-700 font-medium">
+                    Enter the <strong>names</strong> of environment variables (e.g. <code className="bg-yellow-100 px-1 rounded">TEST_USERNAME</code>), not the actual credentials. Playwright reads them at runtime via <code className="bg-yellow-100 px-1 rounded">process.env</code>.
+                  </p>
                   {(form.authType === 'form_login' || form.authType === 'basic_auth') && (
                     <>
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Login URL</label>
                         <input className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                          placeholder="/login" value={form.loginUrl} onChange={e => ch('loginUrl', e.target.value)} />
+                          placeholder="https://your-app.example.com/login" value={form.loginUrl} onChange={e => ch('loginUrl', e.target.value)} />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">Username Env Var</label>
-                          <input className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                            value={form.authUsernameEnv} onChange={e => ch('authUsernameEnv', e.target.value)} />
+                          <label className="block text-xs text-gray-500 mb-1">Username Env Var Name</label>
+                          <input className={`w-full text-sm border rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none font-mono ${errors.authUsernameEnv ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
+                            placeholder="TEST_USERNAME" value={form.authUsernameEnv} onChange={e => ch('authUsernameEnv', e.target.value)} />
+                          {errors.authUsernameEnv && <p className="text-[10px] text-red-500 mt-0.5">{errors.authUsernameEnv}</p>}
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">Password Env Var</label>
-                          <input className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                            value={form.authPasswordEnv} onChange={e => ch('authPasswordEnv', e.target.value)} />
+                          <label className="block text-xs text-gray-500 mb-1">Password Env Var Name</label>
+                          <input className={`w-full text-sm border rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none font-mono ${errors.authPasswordEnv ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
+                            placeholder="TEST_PASSWORD" value={form.authPasswordEnv} onChange={e => ch('authPasswordEnv', e.target.value)} />
+                          {errors.authPasswordEnv && <p className="text-[10px] text-red-500 mt-0.5">{errors.authPasswordEnv}</p>}
                         </div>
                       </div>
                     </>
                   )}
                   {form.authType === 'token' && (
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Token Env Var</label>
-                      <input className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                        value={form.authTokenEnv} onChange={e => ch('authTokenEnv', e.target.value)} />
+                      <label className="block text-xs text-gray-500 mb-1">Token Env Var Name</label>
+                      <input className={`w-full text-sm border rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none font-mono ${errors.authTokenEnv ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
+                        placeholder="AUTH_BEARER_TOKEN" value={form.authTokenEnv} onChange={e => ch('authTokenEnv', e.target.value)} />
+                      {errors.authTokenEnv && <p className="text-[10px] text-red-500 mt-0.5">{errors.authTokenEnv}</p>}
                     </div>
                   )}
                 </div>
               )}
 
+              {/* Selector Map — structured fields for login flow */}
+              <div className="border border-gray-200 rounded-lg">
+                <button onClick={() => setSelectorMapOpen(!selectorMapOpen)}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-xs font-medium text-gray-500 uppercase hover:text-brand-600">
+                  <MapPin size={13} className="text-gray-400" />
+                  Selector Mapping (Login Flow)
+                  {selectorMapOpen ? <ChevronDown size={13} className="ml-auto" /> : <ChevronRight size={13} className="ml-auto" />}
+                  {Object.values(form.selectorMap).filter(Boolean).length > 0 && (
+                    <span className="ml-1 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
+                      {Object.values(form.selectorMap).filter(Boolean).length} mapped
+                    </span>
+                  )}
+                </button>
+                {selectorMapOpen && (
+                  <div className="px-3 pb-3 space-y-2 border-t border-gray-100 pt-2">
+                    <p className="text-[10px] text-gray-400">
+                      Map logical element names to Playwright locators. These are used during test generation and readiness validation.
+                    </p>
+                    {DEFAULT_SELECTOR_KEYS.map(({ key, label, placeholder }) => (
+                      <div key={key}>
+                        <label className="block text-[11px] text-gray-500 mb-0.5">{label}</label>
+                        <input
+                          className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 font-mono focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                          placeholder={placeholder}
+                          value={form.selectorMap[key] || ''}
+                          onChange={e => chSelector(key, e.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Known data-testid values (comma-separated)</label>
                 <input className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none"
                   placeholder="submit-btn, email-input, error-toast" value={form.knownTestids} onChange={e => ch('knownTestids', e.target.value)} />
-                <p className="text-[10px] text-gray-400 mt-0.5">Verified test IDs from your app. Leave empty to use role-first selectors.</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Verified data-testid attributes from your app. Leave empty to use role-first selectors.</p>
               </div>
 
-              <button onClick={handleSave} disabled={saving || !form.baseUrl}
+              <button onClick={handleSave} disabled={saving || !form.baseUrl || hasErrors}
                 className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                {showNew ? 'Create & Link Config' : 'Save Config'}
+                {showNew ? 'Create & Link Config' : 'Save & Link Config'}
               </button>
             </>
           )}
@@ -293,7 +397,7 @@ export default function AutomationAssetDetailPage() {
     setPreflight(null);
     try {
       const result = await api.verifyReadiness(projectId, assetId);
-      setReadiness({ validation: result.validation, executionReadiness: result.validation.validation_status === 'passed' ? 'validated' : asset.execution_readiness });
+      setReadiness({ validation: result.validation, executionReadiness: result.validation.validation_status === 'passed' ? 'validated' : 'draft' });
       setPreflight(result.preflight);
       const a = await api.getAutomationAsset(projectId, assetId);
       setAsset(a);
@@ -320,10 +424,7 @@ export default function AutomationAssetDetailPage() {
     catch (err) { alert(err.message); }
   };
 
-  const handlePrereqSaved = async (configId) => {
-    // Link the config to the asset by updating target_app_config_id via direct DB call
-    // The backend automationAssets PATCH doesn't support this field, so we do it via the route's POST body workaround
-    // For now, just refresh and re-verify
+  const handlePrereqSaved = async () => {
     await load();
     // Auto-verify after saving prerequisites
     setTimeout(handleVerifyReadiness, 500);
@@ -392,7 +493,7 @@ export default function AutomationAssetDetailPage() {
                 <div key={i} className="flex items-center gap-2 text-xs">
                   <CheckCircle size={12} className="text-green-500 shrink-0" />
                   <span className="text-gray-600">{c.name?.replace(/_/g, ' ')}</span>
-                  <span className="text-gray-400 ml-auto">{c.detail}</span>
+                  <span className="text-gray-400 ml-auto truncate max-w-xs">{c.detail}</span>
                 </div>
               ))}
               {(preflight?.blockers || blockers).map((b, i) => (
