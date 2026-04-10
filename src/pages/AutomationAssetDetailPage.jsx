@@ -129,7 +129,10 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
     setSaving(true);
     try {
       const knownTestidsArr = form.knownTestids ? form.knownTestids.split(',').map(s => s.trim()).filter(Boolean) : [];
-      const selectorMap = form.selectorMap || {};
+      // Filter out empty selector map entries — backend requires min 1 char per value
+      const selectorMap = Object.fromEntries(
+        Object.entries(form.selectorMap || {}).filter(([, v]) => v && v.trim())
+      );
 
       let saved;
       if (showNew || !selectedConfigId) {
