@@ -17,6 +17,8 @@ import EnvironmentsPage from './pages/EnvironmentsPage';
 import SchedulesPage from './pages/SchedulesPage';
 import AutomationPage from './pages/AutomationPage';
 import AutomationAssetDetailPage from './pages/AutomationAssetDetailPage';
+import TeamPage from './pages/TeamPage';
+import AcceptInvitePage from './pages/AcceptInvitePage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -53,6 +55,8 @@ export default function App() {
       <Route path="/executions" element={<ProtectedRoute><ExecutionsPage /></ProtectedRoute>} />
       <Route path="/executions/:executionId" element={<ProtectedRoute><ExecutionDetailPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/team" element={<ProtectedRoute><TeamPage /></ProtectedRoute>} />
+      <Route path="/accept-invite" element={<AcceptInvitePage />} />
     </Routes>
   );
 }

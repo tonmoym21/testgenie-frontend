@@ -22,6 +22,7 @@ export default function Layout({ children }) {
     { path: '/executions', label: 'Executions', icon: Play },
     { path: '/stories', label: 'Stories', icon: BookOpen },
     { path: '/environments', label: 'Environments', icon: Settings },
+    { path: '/team', label: 'Team', icon: Users }
   ];
 
   return (

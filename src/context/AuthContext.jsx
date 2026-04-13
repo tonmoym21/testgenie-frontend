@@ -10,7 +10,13 @@ function decodeToken(token) {
     const payload = JSON.parse(atob(token.split('.')[1]));
     // Check expiry — reject if expired
     if (payload.exp && Date.now() >= payload.exp * 1000) return null;
-    return { id: payload.sub, email: payload.email, exp: payload.exp };
+    return {
+      id: payload.sub,
+      email: payload.email,
+      exp: payload.exp,
+      orgId: payload.orgId || null,
+      role: payload.role || null,
+    };
   } catch {
     return null;
   }
@@ -20,7 +26,14 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const token = localStorage.getItem('accessToken');
     const decoded = decodeToken(token);
-    if (decoded) return { id: decoded.id, email: decoded.email };
+    if (decoded) {
+      return {
+        id: decoded.id,
+        email: decoded.email,
+        orgId: decoded.orgId,
+        role: decoded.role,
+      };
+    }
 
     // Access token expired but refresh token may still be valid — we'll try refresh in useEffect
     const refreshToken = localStorage.getItem('refreshToken');
@@ -49,7 +62,12 @@ export function AuthProvider({ children }) {
         const newToken = localStorage.getItem('accessToken');
         const newDecoded = decodeToken(newToken);
         if (newDecoded) {
-          setUser({ id: newDecoded.id, email: newDecoded.email });
+          setUser({
+            id: newDecoded.id,
+            email: newDecoded.email,
+            orgId: newDecoded.orgId,
+            role: newDecoded.role,
+          });
           scheduleRefresh(); // schedule next refresh
         }
       } else {
@@ -73,7 +91,12 @@ export function AuthProvider({ children }) {
           const newToken = localStorage.getItem('accessToken');
           const newDecoded = decodeToken(newToken);
           if (newDecoded) {
-            setUser({ id: newDecoded.id, email: newDecoded.email });
+            setUser({
+              id: newDecoded.id,
+              email: newDecoded.email,
+              orgId: newDecoded.orgId,
+              role: newDecoded.role,
+            });
             scheduleRefresh();
           }
         } else {
@@ -104,7 +127,12 @@ export function AuthProvider({ children }) {
         } else {
           const decoded = decodeToken(e.newValue);
           if (decoded) {
-            setUser({ id: decoded.id, email: decoded.email });
+            setUser({
+              id: decoded.id,
+              email: decoded.email,
+              orgId: decoded.orgId,
+              role: decoded.role,
+            });
             scheduleRefresh();
           }
         }
@@ -117,7 +145,12 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const data = await api.login(email, password);
     const payload = JSON.parse(atob(data.accessToken.split('.')[1]));
-    setUser({ id: payload.sub, email: payload.email });
+    setUser({
+      id: payload.sub,
+      email: payload.email,
+      orgId: payload.orgId || null,
+      role: payload.role || null,
+    });
     scheduleRefresh();
     return data;
   }, [scheduleRefresh]);
@@ -126,14 +159,44 @@ export function AuthProvider({ children }) {
     return api.register(email, password);
   }, []);
 
+  const registerWithInvite = useCallback(async (email, password, inviteToken) => {
+    const res = await fetch(`${api.API_BASE || '/api'}/auth/register-with-invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, inviteToken }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const error = new Error(data.error?.message || 'Registration failed');
+      error.code = data.error?.code;
+      throw error;
+    }
+    return data;
+  }, []);
+
   const logout = useCallback(async () => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     await api.logout();
     setUser(null);
   }, []);
 
+  // Helper to check if user can manage team
+  const canManageTeam = user?.role === 'owner' || user?.role === 'admin';
+  const isOwner = user?.role === 'owner';
+  const hasOrganization = !!user?.orgId;
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{
+      user,
+      login,
+      register,
+      registerWithInvite,
+      logout,
+      isAuthenticated: !!user,
+      canManageTeam,
+      isOwner,
+      hasOrganization,
+    }}>
       {children}
     </AuthContext.Provider>
   );
