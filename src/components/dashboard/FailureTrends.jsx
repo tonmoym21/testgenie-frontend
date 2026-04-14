@@ -1,76 +1,56 @@
-import { useState } from 'react';
+/**
+ * FailureTrends Component
+ * Displays a bar chart of daily test pass/fail counts
+ */
 
-export default function FailureTrends({ data = [] }) {
-  const [hoveredDay, setHoveredDay] = useState(null);
-  const maxVal = Math.max(...data.map((d) => d.total), 1);
+export default function FailureTrends({ dailyTrend }) {
+  if (!dailyTrend || dailyTrend.length === 0) {
+    return (
+      <div className="h-48 flex items-center justify-center text-gray-400">
+        <p className="text-sm">No trend data available yet. Run some tests to see trends!</p>
+      </div>
+    );
+  }
+
+  const maxTotal = Math.max(...dailyTrend.map(d => (d.total || d.passed + d.failed || 0)), 1);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h3 className="font-semibold text-sm text-gray-900">Failure Trends</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Last 7 days</p>
-        </div>
-        <div className="flex items-center gap-4 text-xs text-gray-400">
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-400" /> Passed</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400" /> Failed</span>
-        </div>
-      </div>
-
-      <div className="flex items-end gap-3 h-40">
-        {data.map((day, i) => {
-          const passedHeight = (day.passed / maxVal) * 100;
-          const failedHeight = (day.failed / maxVal) * 100;
-          const isHovered = hoveredDay === i;
-
-          return (
-            <div
-              key={day.day}
-              className="flex-1 flex flex-col items-center gap-1 relative"
-              onMouseEnter={() => setHoveredDay(i)}
-              onMouseLeave={() => setHoveredDay(null)}
-            >
-              {/* Tooltip */}
-              {isHovered && (
-                <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap z-10 shadow-lg">
-                  <div className="font-medium mb-1">{day.day}</div>
-                  <div className="flex gap-3">
-                    <span className="text-green-300">{day.passed} passed</span>
-                    <span className="text-red-300">{day.failed} failed</span>
-                  </div>
-                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900" />
-                </div>
-              )}
-
-              {/* Bar */}
-              <div className="w-full flex flex-col justify-end h-32 gap-0.5">
-                <div
-                  className="w-full bg-red-400 rounded-t transition-all duration-300"
-                  style={{ height: `${failedHeight}%`, minHeight: day.failed > 0 ? '4px' : '0' }}
-                />
-                <div
-                  className="w-full bg-green-400 rounded-b transition-all duration-300"
-                  style={{ height: `${passedHeight}%`, minHeight: '4px' }}
-                />
+    <div className="h-48 flex items-end gap-1">
+      {dailyTrend.slice(-30).map((d, i) => {
+        const total = d.total || (d.passed + d.failed) || 0;
+        const passed = d.passed || 0;
+        const failed = d.failed || 0;
+        const passedHeight = (passed / maxTotal) * 100;
+        const failedHeight = (failed / maxTotal) * 100;
+        const date = d.date ? new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : `Day ${i + 1}`;
+        
+        return (
+          <div 
+            key={i} 
+            className="flex-1 flex flex-col gap-0.5 group relative"
+            title={`${date}: ${passed} passed, ${failed} failed`}
+          >
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+              <div className="bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
+                <div className="font-medium">{date}</div>
+                <div className="text-green-300">{passed} passed</div>
+                <div className="text-red-300">{failed} failed</div>
               </div>
-
-              {/* Label */}
-              <span className={`text-xs transition-colors ${isHovered ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
-                {day.day}
-              </span>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Summary row */}
-      <div className="flex justify-between mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500">
-        <span>Total: {data.reduce((s, d) => s + d.total, 0)} runs</span>
-        <span>Failures: {data.reduce((s, d) => s + d.failed, 0)}</span>
-        <span>
-          Rate: {Math.round((data.reduce((s, d) => s + d.passed, 0) / Math.max(data.reduce((s, d) => s + d.total, 0), 1)) * 100)}%
-        </span>
-      </div>
+            
+            {/* Bars */}
+            <div 
+              className="bg-red-400 rounded-t transition-all" 
+              style={{ height: `${failedHeight}%`, minHeight: failed ? 2 : 0 }} 
+            />
+            <div 
+              className="bg-green-400 rounded-b transition-all" 
+              style={{ height: `${passedHeight}%`, minHeight: passed ? 2 : 0 }} 
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
