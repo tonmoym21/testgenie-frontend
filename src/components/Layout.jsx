@@ -1,9 +1,9 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings, Clock, BookOpen, Bot } from 'lucide-react';
+import { Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings, Clock, BookOpen, Bot, Users } from 'lucide-react';
 
 export default function Layout({ children }) {
-  const { user, logout } = useAuth();
+  const { user, logout, canManageTeam } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -22,8 +22,12 @@ export default function Layout({ children }) {
     { path: '/executions', label: 'Executions', icon: Play },
     { path: '/stories', label: 'Stories', icon: BookOpen },
     { path: '/environments', label: 'Environments', icon: Settings },
-    { path: '/team', label: 'Team', icon: Users }
   ];
+
+  // Add Team nav for admins/owners only
+  if (canManageTeam) {
+    navItems.push({ path: '/team', label: 'Team', icon: Users });
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -49,8 +53,6 @@ export default function Layout({ children }) {
               </Link>
             );
           })}
-
-      
         </nav>
 
         <div className="p-3 border-t border-white/10">
