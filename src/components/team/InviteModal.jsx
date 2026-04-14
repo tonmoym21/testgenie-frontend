@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { X, Plus, Trash2, Send, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Plus, Trash2, Send, AlertCircle, CheckCircle, Copy, Check, Link2 } from 'lucide-react';
 import { teamApi } from '../../services/teamService';
 
 export default function InviteModal({ isOwner, onClose, onSuccess }) {
   const [invites, setInvites] = useState([{ email: '', role: 'member' }]);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
+  const [copiedLink, setCopiedLink] = useState(null);
 
   const handleAddRow = () => {
     if (invites.length >= 10) return;
@@ -56,6 +57,14 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
     } else {
       onClose();
     }
+  };
+
+  const copyInviteLink = (inviteUrl) => {
+    const fullUrl = `${window.location.origin}${inviteUrl}`;
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      setCopiedLink(inviteUrl);
+      setTimeout(() => setCopiedLink(null), 2000);
+    });
   };
 
   const hasValidEmails = invites.some((inv) => inv.email.trim());
@@ -155,19 +164,66 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
               {/* Success results */}
               {results.created.length > 0 && (
                 <div className="mb-4">
-                  <div className="flex items-center gap-2 text-green-600 mb-2">
+                  <div className="flex items-center gap-2 text-green-600 mb-3">
                     <CheckCircle size={18} />
                     <span className="font-medium">
-                      {results.created.length} invite{results.created.length !== 1 ? 's' : ''} sent successfully
+                      {results.created.length} invite{results.created.length !== 1 ? 's' : ''} created
                     </span>
                   </div>
-                  <ul className="space-y-1">
+                  
+                  {/* Invite Links - Show even if email sent */}
+                  <div className="space-y-3">
                     {results.created.map((inv, i) => (
-                      <li key={i} className="text-sm text-gray-600 pl-6">
-                        • {inv.email} ({inv.role})
-                      </li>
+                      <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-900">{inv.email}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            inv.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {inv.role}
+                          </span>
+                        </div>
+                        
+                        {/* Email status */}
+                        {inv.emailSent ? (
+                          <div className="text-xs text-green-600 mb-2 flex items-center gap-1">
+                            <CheckCircle size={12} />
+                            Email sent successfully
+                          </div>
+                        ) : (
+                          <div className="text-xs text-amber-600 mb-2 flex items-center gap-1">
+                            <AlertCircle size={12} />
+                            Email not sent - share link manually
+                          </div>
+                        )}
+                        
+                        {/* Invite Link */}
+                        {inv.inviteUrl && (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-white border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-600 font-mono truncate">
+                              {window.location.origin}{inv.inviteUrl}
+                            </div>
+                            <button
+                              onClick={() => copyInviteLink(inv.inviteUrl)}
+                              className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Copy invite link"
+                            >
+                              {copiedLink === inv.inviteUrl ? (
+                                <Check size={16} className="text-green-600" />
+                              ) : (
+                                <Copy size={16} />
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     ))}
-                  </ul>
+                  </div>
+                  
+                  <p className="text-xs text-gray-500 mt-3 flex items-center gap-1">
+                    <Link2 size={12} />
+                    Copy and share the invite link(s) with your team members
+                  </p>
                 </div>
               )}
 
