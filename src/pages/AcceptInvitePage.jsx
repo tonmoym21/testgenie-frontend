@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { teamApi } from '../services/teamService';
@@ -23,7 +23,10 @@ export default function AcceptInvitePage() {
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch invite info on mount
+  // Track whether we've already tried auto-accept to avoid loops
+  const autoAcceptAttempted = useRef(false);
+
+  // Fetch invite info on mount (public endpoint — no auth required)
   useEffect(() => {
     if (!token) {
       setError('No invite token provided');
@@ -40,17 +43,19 @@ export default function AcceptInvitePage() {
         if (!info.isValid) {
           setError(info.isExpired ? 'This invite has expired' : 'This invite is no longer valid');
           setMode('error');
-        } else if (isAuthenticated) {
+        } else if (isAuthenticated && !autoAcceptAttempted.current) {
           // User is logged in, check if email matches
           if (user.email.toLowerCase() === info.email.toLowerCase()) {
-            // Auto-accept
-            handleAcceptInvite();
+            // Try auto-accept
+            autoAcceptAttempted.current = true;
+            tryAcceptInvite();
           } else {
-            setError(`This invite was sent to ${info.email}. You are logged in as ${user.email}. Please log out and try again.`);
-            setMode('error');
+            // Logged in as wrong user — show login form so they can re-auth
+            setMode('login');
+            setFormError(`This invite was sent to ${info.email}. You are logged in as ${user.email}. Please sign in with the correct account.`);
           }
         } else {
-          // User not logged in - show register/login options
+          // User not logged in — show register/login options
           setMode('register');
         }
       })
@@ -59,18 +64,34 @@ export default function AcceptInvitePage() {
         setMode('error');
       })
       .finally(() => setLoading(false));
-  }, [token, isAuthenticated, user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
-  const handleAcceptInvite = async () => {
+  /**
+   * Try accepting the invite. If it fails with an auth error (401),
+   * fall back to the login form instead of showing a dead-end error.
+   */
+  const tryAcceptInvite = async () => {
     setMode('accepting');
     try {
       await teamApi.acceptInvite(token);
       setMode('success');
-      // Redirect to dashboard after 2 seconds
       setTimeout(() => navigate('/dashboard'), 2000);
     } catch (err) {
-      setError(err.message);
-      setMode('error');
+      // Auth-related failures → show login form so user can re-authenticate
+      const isAuthError =
+        err.status === 401 ||
+        err.message?.toLowerCase().includes('authorization') ||
+        err.message?.toLowerCase().includes('session expired') ||
+        err.message?.toLowerCase().includes('token');
+
+      if (isAuthError) {
+        setMode('login');
+        setFormError('Your session has expired. Please sign in again to accept this invite.');
+      } else {
+        setError(err.message);
+        setMode('error');
+      }
     }
   };
 
@@ -110,9 +131,19 @@ export default function AcceptInvitePage() {
     try {
       await login(email, password);
       // After login, accept the invite
-      await teamApi.acceptInvite(token);
-      setMode('success');
-      setTimeout(() => navigate('/dashboard'), 2000);
+      try {
+        await teamApi.acceptInvite(token);
+        setMode('success');
+        setTimeout(() => navigate('/dashboard'), 2000);
+      } catch (acceptErr) {
+        // If already a member (e.g. registerWithInvite already accepted), just go to dashboard
+        if (acceptErr.message?.includes('Already a member')) {
+          setMode('success');
+          setTimeout(() => navigate('/dashboard'), 2000);
+        } else {
+          setFormError(acceptErr.message || 'Failed to accept invite after login');
+        }
+      }
     } catch (err) {
       setFormError(err.message);
     } finally {
@@ -162,7 +193,7 @@ export default function AcceptInvitePage() {
     );
   }
 
-  // Error state
+  // Error state (only for non-recoverable errors like invalid/expired invite)
   if (mode === 'error') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -210,7 +241,7 @@ export default function AcceptInvitePage() {
           {/* Mode tabs */}
           <div className="flex gap-2 mb-6">
             <button
-              onClick={() => setMode('register')}
+              onClick={() => { setMode('register'); setFormError(''); }}
               className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
                 mode === 'register' ? 'bg-brand-100 text-brand-700' : 'text-gray-500 hover:bg-gray-100'
               }`}
@@ -218,7 +249,7 @@ export default function AcceptInvitePage() {
               Create Account
             </button>
             <button
-              onClick={() => setMode('login')}
+              onClick={() => { setMode('login'); setFormError(''); }}
               className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
                 mode === 'login' ? 'bg-brand-100 text-brand-700' : 'text-gray-500 hover:bg-gray-100'
               }`}
@@ -293,8 +324,8 @@ export default function AcceptInvitePage() {
                 <input
                   type="email"
                   value={email}
-                  disabled
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                 />
               </div>
               <div>

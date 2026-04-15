@@ -8,6 +8,7 @@ class ApiService {
     this.refreshToken = localStorage.getItem('refreshToken');
     this._refreshPromise = null;
     this._onSessionExpired = null;
+    this.API_BASE = API_BASE;
   }
 
   setTokens(accessToken, refreshToken) {
@@ -89,6 +90,26 @@ class ApiService {
 
   onSessionExpired(cb) { this._onSessionExpired = cb; }
   _emitSessionExpired() { if (this._onSessionExpired) this._onSessionExpired(); }
+
+  /**
+   * Make an unauthenticated request (no Authorization header, no token refresh).
+   * Use for public endpoints like invite-info.
+   */
+  async publicRequest(method, path, body = null) {
+    const headers = { 'Content-Type': 'application/json' };
+    const options = { method, headers };
+    if (body) options.body = JSON.stringify(body);
+    const res = await fetch(`${API_BASE}${path}`, options);
+    const data = await res.json();
+    if (!res.ok) {
+      const error = new Error(data.error?.message || 'Request failed');
+      error.code = data.error?.code;
+      error.status = res.status;
+      error.details = data.error?.details;
+      throw error;
+    }
+    return data;
+  }
 
   // Auth
   async register(email, password) { return this.request('POST', '/auth/register', { email, password }); }

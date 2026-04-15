@@ -76,7 +76,7 @@ export const teamApi = {
   },
 
   async getInviteInfo(token) {
-    return api.request('GET', `/team/invite-info?token=${token}`);
+    return api.publicRequest('GET', `/team/invite-info?token=${token}`);
   },
 
   async acceptInvite(token) {

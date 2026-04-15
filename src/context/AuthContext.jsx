@@ -160,7 +160,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const registerWithInvite = useCallback(async (email, password, inviteToken) => {
-    const res = await fetch(`${api.API_BASE || '/api'}/auth/register-with-invite`, {
+    const res = await fetch(`${api.API_BASE}/auth/register-with-invite`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, inviteToken }),
