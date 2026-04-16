@@ -35,12 +35,14 @@ export default function TeamPage() {
     try {
       const org = await teamApi.getOrganization();
       setOrganization(org);
+      return org;
     } catch (err) {
       if (err.status === 404) {
         setOrganization(null);
-      } else {
-        setError(err.message);
+        return null;
       }
+      setError(err.message);
+      return null;
     }
   }, []);
 
@@ -51,7 +53,7 @@ export default function TeamPage() {
         role: roleFilter || undefined,
         search: searchQuery || undefined,
       });
-      setMembers(result.members);
+      setMembers(result.members || []);
     } catch (err) {
       setError(err.message);
     }
@@ -60,7 +62,7 @@ export default function TeamPage() {
   const fetchInvites = useCallback(async () => {
     try {
       const result = await teamApi.listInvites('pending');
-      setInvites(result.invites);
+      setInvites(result.invites || []);
     } catch (err) {
       setError(err.message);
     }
@@ -69,18 +71,26 @@ export default function TeamPage() {
   const fetchDomains = useCallback(async () => {
     try {
       const result = await teamApi.listDomains();
-      setDomains(result.domains);
+      setDomains(result.domains || []);
     } catch (err) {
       setError(err.message);
     }
   }, []);
 
+  /**
+   * Load everything. Does NOT depend on canManage (which is derived from
+   * `organization` state) — instead, uses the fresh org returned from
+   * fetchOrganization to decide whether to fetch manage-only data. This avoids
+   * the classic "first-load shows 0 counts" race where canManage was false
+   * during the only call.
+   */
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      await fetchOrganization();
-      if (canManage) {
+      const org = await fetchOrganization();
+      const canManageFresh = org && (org.userRole === 'owner' || org.userRole === 'admin');
+      if (canManageFresh) {
         await Promise.all([fetchMembers(), fetchInvites(), fetchDomains()]);
       }
     } catch (err) {
@@ -88,10 +98,14 @@ export default function TeamPage() {
     } finally {
       setLoading(false);
     }
-  }, [fetchOrganization, fetchMembers, fetchInvites, fetchDomains, canManage]);
+  }, [fetchOrganization, fetchMembers, fetchInvites, fetchDomains]);
 
+  // Initial load — run loadData once when the component mounts. The
+  // dependency on loadData is stable (useCallback) so this effect does not
+  // re-fire spuriously, but it WILL re-fire if loadData's deps actually change.
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -154,9 +168,22 @@ export default function TeamPage() {
   const handleResendInvite = async (inviteId) => {
     setActionLoading(true);
     try {
-      await teamApi.resendInvite(inviteId);
+      const result = await teamApi.resendInvite(inviteId);
       await fetchInvites();
-      alert('Invite resent successfully');
+      // Show the fresh invite URL to the admin — mail is parked, so they need
+      // to copy/share the link manually.
+      if (result?.inviteUrl) {
+        const fullUrl = `${window.location.origin}${result.inviteUrl}`;
+        try {
+          await navigator.clipboard.writeText(fullUrl);
+          alert(`Invite link regenerated and copied to clipboard:\n\n${fullUrl}`);
+        } catch {
+          // clipboard not available (e.g. http or permission denied)
+          window.prompt('Invite link regenerated. Copy this link:', fullUrl);
+        }
+      } else {
+        alert('Invite resent successfully');
+      }
     } catch (err) {
       alert(err.message);
     } finally {
@@ -219,9 +246,13 @@ export default function TeamPage() {
     }
   };
 
-  const handleInviteSuccess = () => {
+  const handleInviteSuccess = async () => {
     setShowInviteModal(false);
-    fetchInvites();
+    // Refresh BOTH invites (new pending rows) and members (bulk-invites that
+    // join existing users may also update member lists) so counts are always live.
+    await Promise.all([fetchInvites(), fetchMembers()]);
+    // Auto-switch to Invites tab so the admin immediately sees the new link(s).
+    setActiveTab('invites');
   };
 
   // Not part of organization

@@ -197,10 +197,15 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
                             <CheckCircle size={12} />
                             Email sent successfully
                           </div>
+                        ) : inv.mailDisabled ? (
+                          <div className="text-xs text-blue-700 mb-2 flex items-center gap-1">
+                            <Link2 size={12} />
+                            Email delivery is disabled — share the invite link manually
+                          </div>
                         ) : (
                           <div className="text-xs text-amber-600 mb-2 flex items-center gap-1">
                             <AlertCircle size={12} />
-                            Email not sent - share link manually
+                            Email not sent — share link manually
                           </div>
                         )}
                         
