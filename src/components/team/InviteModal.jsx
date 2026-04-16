@@ -176,7 +176,14 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
                     {results.created.map((inv, i) => (
                       <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-900">{inv.email}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">{inv.email}</span>
+                            {inv.reused && (
+                              <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                                Refreshed
+                              </span>
+                            )}
+                          </div>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
                             inv.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
                           }`}>
