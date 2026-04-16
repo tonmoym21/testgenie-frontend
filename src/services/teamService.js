@@ -7,7 +7,7 @@ export const teamApi = {
   // ─────────────────────────────────────────────────────────────────────────
   // ORGANIZATION
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   async getOrganization() {
     return api.request('GET', '/team/organization');
   },
@@ -19,7 +19,7 @@ export const teamApi = {
   // ─────────────────────────────────────────────────────────────────────────
   // MEMBERS
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   async listMembers(params = {}) {
     const query = new URLSearchParams();
     if (params.status) query.set('status', params.status);
@@ -54,7 +54,7 @@ export const teamApi = {
   // ─────────────────────────────────────────────────────────────────────────
   // INVITES
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   async listInvites(status = 'pending') {
     return api.request('GET', `/team/invites?status=${status}`);
   },
@@ -75,18 +75,29 @@ export const teamApi = {
     return api.request('DELETE', `/team/invites/${inviteId}`);
   },
 
+  /** Public — fetches invite metadata without auth. */
   async getInviteInfo(token) {
-    return api.publicRequest('GET', `/team/invite-info?token=${token}`);
+    return api.publicRequest('GET', `/team/invite-info?token=${encodeURIComponent(token)}`);
   },
 
+  /**
+   * Accept an invite.
+   *  - If `api` has a valid access token, send it (logged-in acceptance).
+   *  - If not, call without auth. Backend returns 401 AUTH_REQUIRED_FOR_INVITE
+   *    which the UI surfaces as "please sign in or register" instead of the
+   *    confusing generic "Missing or malformed authorization header".
+   */
   async acceptInvite(token) {
-    return api.request('POST', '/team/accept-invite', { token });
+    if (api.isAuthenticated()) {
+      return api.request('POST', '/team/accept-invite', { token });
+    }
+    return api.publicRequest('POST', '/team/accept-invite', { token });
   },
 
   // ─────────────────────────────────────────────────────────────────────────
   // DOMAINS
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   async listDomains() {
     return api.request('GET', '/team/domains');
   },
@@ -102,7 +113,7 @@ export const teamApi = {
   // ─────────────────────────────────────────────────────────────────────────
   // AUDIT LOGS
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   async getAuditLogs(params = {}) {
     const query = new URLSearchParams();
     if (params.action) query.set('action', params.action);
@@ -116,7 +127,7 @@ export const teamApi = {
   // ─────────────────────────────────────────────────────────────────────────
   // CURRENT USER TEAM INFO
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   async getMyTeamInfo() {
     return api.request('GET', '/team/me');
   },

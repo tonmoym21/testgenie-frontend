@@ -8,14 +8,14 @@ export default function AcceptInvitePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isAuthenticated, registerWithInvite, login } = useAuth();
-  
+
   const token = searchParams.get('token');
-  
+
   const [inviteInfo, setInviteInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [mode, setMode] = useState('loading'); // loading, login, register, accepting, success, error
-  
+
   // Registration form
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,23 +39,34 @@ export default function AcceptInvitePage() {
       .then((info) => {
         setInviteInfo(info);
         setEmail(info.email);
-        
+
         if (!info.isValid) {
-          setError(info.isExpired ? 'This invite has expired' : 'This invite is no longer valid');
-          setMode('error');
+          if (info.status === 'accepted') {
+            setError('This invite has already been accepted. Please sign in to continue.');
+            setMode('login');
+          } else if (info.status === 'revoked') {
+            setError('This invite was revoked. Please contact your admin for a new one.');
+            setMode('error');
+          } else if (info.isExpired) {
+            setError('This invite has expired. Please ask your admin to resend it.');
+            setMode('error');
+          } else {
+            setError('This invite is no longer valid.');
+            setMode('error');
+          }
         } else if (isAuthenticated && !autoAcceptAttempted.current) {
           // User is logged in, check if email matches
-          if (user.email.toLowerCase() === info.email.toLowerCase()) {
-            // Try auto-accept
+          if (user && user.email && user.email.toLowerCase() === info.email.toLowerCase()) {
             autoAcceptAttempted.current = true;
             tryAcceptInvite();
           } else {
-            // Logged in as wrong user — show login form so they can re-auth
             setMode('login');
-            setFormError(`This invite was sent to ${info.email}. You are logged in as ${user.email}. Please sign in with the correct account.`);
+            setFormError(
+              `This invite was sent to ${info.email}. You are logged in as ${user?.email || 'someone else'}. ` +
+              `Please sign in with the correct account.`
+            );
           }
         } else {
-          // User not logged in — show register/login options
           setMode('register');
         }
       })
@@ -64,12 +75,12 @@ export default function AcceptInvitePage() {
         setMode('error');
       })
       .finally(() => setLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   /**
-   * Try accepting the invite. If it fails with an auth error (401),
-   * fall back to the login form instead of showing a dead-end error.
+   * Try accepting the invite. If it fails with an auth-required error, show the
+   * login form instead of dead-ending. For other errors, show a clear message.
    */
   const tryAcceptInvite = async () => {
     setMode('accepting');
@@ -78,20 +89,39 @@ export default function AcceptInvitePage() {
       setMode('success');
       setTimeout(() => navigate('/dashboard'), 2000);
     } catch (err) {
-      // Auth-related failures → show login form so user can re-authenticate
-      const isAuthError =
-        err.status === 401 ||
-        err.message?.toLowerCase().includes('authorization') ||
-        err.message?.toLowerCase().includes('session expired') ||
-        err.message?.toLowerCase().includes('token');
+      const code = err.code;
 
-      if (isAuthError) {
+      // Backend explicitly tells us to log in or register
+      if (code === 'AUTH_REQUIRED_FOR_INVITE' || code === 'SESSION_EXPIRED' || err.status === 401) {
         setMode('login');
-        setFormError('Your session has expired. Please sign in again to accept this invite.');
-      } else {
-        setError(err.message);
-        setMode('error');
+        setFormError('Please sign in to accept this invite.');
+        return;
       }
+
+      // Already a member — treat as success
+      if (code === 'ALREADY_MEMBER' || (err.message || '').toLowerCase().includes('already a member')) {
+        setMode('success');
+        setTimeout(() => navigate('/dashboard'), 2000);
+        return;
+      }
+
+      // Wrong account — show login to switch
+      if (code === 'WRONG_ACCOUNT' || err.status === 403) {
+        setMode('login');
+        setFormError(err.message || 'This invite belongs to a different account.');
+        return;
+      }
+
+      // Invalid / expired
+      if (code === 'INVITE_INVALID' || code === 'INVITE_NOT_FOUND') {
+        setError(err.message || 'This invite is no longer valid.');
+        setMode('error');
+        return;
+      }
+
+      // Fallback
+      setError(err.message || 'Could not accept invite');
+      setMode('error');
     }
   };
 
@@ -103,7 +133,6 @@ export default function AcceptInvitePage() {
       setFormError('Passwords do not match');
       return;
     }
-
     if (password.length < 8) {
       setFormError('Password must be at least 8 characters');
       return;
@@ -111,13 +140,20 @@ export default function AcceptInvitePage() {
 
     setSubmitting(true);
     try {
+      // Backend's register-with-invite creates user AND accepts invite atomically.
       await registerWithInvite(email, password, token);
-      // After registration, log them in
+      // Log them in so they have tokens
       await login(email, password);
       setMode('success');
       setTimeout(() => navigate('/dashboard'), 2000);
     } catch (err) {
-      setFormError(err.message);
+      // If they already have an account, nudge them to sign in instead
+      if ((err.message || '').toLowerCase().includes('already registered')) {
+        setFormError('You already have an account. Please switch to Sign In.');
+        setMode('login');
+      } else {
+        setFormError(err.message || 'Registration failed');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -127,25 +163,27 @@ export default function AcceptInvitePage() {
     e.preventDefault();
     setFormError('');
     setSubmitting(true);
-    
+
     try {
       await login(email, password);
-      // After login, accept the invite
+      // After login, accept the invite — api singleton now has valid tokens
       try {
         await teamApi.acceptInvite(token);
         setMode('success');
         setTimeout(() => navigate('/dashboard'), 2000);
       } catch (acceptErr) {
-        // If already a member (e.g. registerWithInvite already accepted), just go to dashboard
-        if (acceptErr.message?.includes('Already a member')) {
+        const code = acceptErr.code;
+        if (code === 'ALREADY_MEMBER' || (acceptErr.message || '').toLowerCase().includes('already a member')) {
           setMode('success');
           setTimeout(() => navigate('/dashboard'), 2000);
+        } else if (code === 'WRONG_ACCOUNT') {
+          setFormError(acceptErr.message || 'This invite was sent to a different email address.');
         } else {
           setFormError(acceptErr.message || 'Failed to accept invite after login');
         }
       }
     } catch (err) {
-      setFormError(err.message);
+      setFormError(err.message || 'Sign in failed');
     } finally {
       setSubmitting(false);
     }
