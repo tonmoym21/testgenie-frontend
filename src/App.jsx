@@ -22,6 +22,8 @@ import AutomationPage from './pages/AutomationPage';
 import AutomationAssetDetailPage from './pages/AutomationAssetDetailPage';
 import TeamPage from './pages/TeamPage';
 import AcceptInvitePage from './pages/AcceptInvitePage';
+import GlobalsPage from './pages/GlobalsPage';
+import JiraPage from './pages/JiraPage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -76,6 +78,10 @@ export default function App() {
 
       {/* Team */}
       <Route path="/team" element={<ProtectedRoute><TeamPage /></ProtectedRoute>} />
+
+      {/* v2.3: Global variables + Jira */}
+      <Route path="/globals" element={<ProtectedRoute><GlobalsPage /></ProtectedRoute>} />
+      <Route path="/jira" element={<ProtectedRoute><JiraPage /></ProtectedRoute>} />
 
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

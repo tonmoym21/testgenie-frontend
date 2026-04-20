@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings, Clock, BookOpen, Bot, Users } from 'lucide-react';
+import { Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings, Clock, BookOpen, Bot, Users, Globe2, Link2 } from 'lucide-react';
 
 export default function Layout({ children }) {
   const { user, logout, canManageTeam } = useAuth();
@@ -22,6 +22,8 @@ export default function Layout({ children }) {
     { path: '/executions', label: 'Executions', icon: Play },
     { path: '/stories', label: 'Stories', icon: BookOpen },
     { path: '/environments', label: 'Environments', icon: Settings },
+    { path: '/globals', label: 'Globals', icon: Globe2 },
+    { path: '/jira', label: 'Jira', icon: Link2 },
   ];
 
   // Add Team nav for admins/owners only
