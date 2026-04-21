@@ -1,12 +1,15 @@
 import GeneratePlaywrightButton from '../components/GeneratePlaywrightButton';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getStory, listScenarios, updateScenarioStatus, getCoverage, exportStoryCsv } from '../services/storyApi';
+import { getStory, listScenarios, updateScenarioStatus, createScenario, getCoverage, exportStoryCsv } from '../services/storyApi';
 
 var CATEGORY_LABELS = {
   happy_path: 'Happy Path', negative: 'Negative', edge: 'Edge Cases', validation: 'Validation',
   role_permission: 'Role / Permission', state_transition: 'State Transition', api_impact: 'API Impact', non_functional: 'Non-Functional',
 };
+
+const VALID_CATEGORIES = ['happy_path', 'negative', 'edge', 'validation', 'role_permission', 'state_transition', 'api_impact', 'non_functional'];
+const VALID_PRIORITIES = ['P0', 'P1', 'P2', 'P3'];
 
 export default function StoryDetailPage() {
   var params = useParams();
@@ -18,6 +21,12 @@ export default function StoryDetailPage() {
   var [error, setError] = useState(null);
   var [exporting, setExporting] = useState(false);
   var [exportMsg, setExportMsg] = useState(null);
+
+  // Manual scenario creation state
+  var [showAddModal, setShowAddModal] = useState(false);
+  var [addForm, setAddForm] = useState({ category: 'happy_path', title: '', summary: '', preconditions: '', test_intent: '', expected_outcome: '', priority: 'P1' });
+  var [addError, setAddError] = useState('');
+  var [addSaving, setAddSaving] = useState(false);
 
   var loadData = useCallback(async function() {
     try {
@@ -37,6 +46,36 @@ export default function StoryDetailPage() {
       var cov = await getCoverage(projectId, storyId);
       setCoverage(cov);
     } catch (err) { alert('Failed: ' + err.message); }
+  }
+
+  async function handleAddScenario(e) {
+    e.preventDefault();
+    setAddError('');
+    setAddSaving(true);
+    try {
+      var preconditionsArr = addForm.preconditions
+        .split('\n')
+        .map(function(s) { return s.trim(); })
+        .filter(Boolean);
+      var created = await createScenario(projectId, storyId, {
+        category: addForm.category,
+        title: addForm.title,
+        summary: addForm.summary,
+        preconditions: preconditionsArr,
+        test_intent: addForm.test_intent,
+        expected_outcome: addForm.expected_outcome,
+        priority: addForm.priority,
+      });
+      setScenarios(function(prev) { return prev.concat(created); });
+      var cov = await getCoverage(projectId, storyId);
+      setCoverage(cov);
+      setShowAddModal(false);
+      setAddForm({ category: 'happy_path', title: '', summary: '', preconditions: '', test_intent: '', expected_outcome: '', priority: 'P1' });
+    } catch (err) {
+      setAddError(err.message || 'Failed to add scenario');
+    } finally {
+      setAddSaving(false);
+    }
   }
 
   async function handleBulkAction(category, newStatus) {
@@ -86,6 +125,10 @@ export default function StoryDetailPage() {
       ),
       React.createElement('div', { style: { display: 'flex', gap: '8px' } },
         React.createElement('button', {
+          style: { backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 18px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
+          onClick: function() { setShowAddModal(true); }
+        }, '+ Add Manual Scenario'),
+        React.createElement('button', {
           style: { backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 18px', fontSize: '14px', fontWeight: '600', opacity: canExport && !exporting ? 1 : 0.5, cursor: canExport && !exporting ? 'pointer' : 'not-allowed' },
           disabled: !canExport || exporting,
           onClick: handleExport
@@ -106,6 +149,106 @@ export default function StoryDetailPage() {
     coverage && coverage.missingCategories.length > 0 && React.createElement('div', {
       style: { backgroundColor: '#fffbeb', color: '#92400e', padding: '10px 14px', borderRadius: '6px', border: '1px solid #fcd34d', fontSize: '13px', marginBottom: '16px' }
     }, '\u26A0 Missing coverage: ' + coverage.missingCategories.map(function(c) { return CATEGORY_LABELS[c] || c; }).join(', ')),
+
+    // Add Manual Scenario modal
+    showAddModal && React.createElement('div', {
+      style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }
+    },
+      React.createElement('div', { style: { backgroundColor: '#fff', borderRadius: '12px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' } },
+        React.createElement('h2', { style: { fontSize: '18px', fontWeight: '700', marginBottom: '20px' } }, 'Add Manual Scenario'),
+        React.createElement('form', { onSubmit: handleAddScenario },
+          // Category
+          React.createElement('div', { style: { marginBottom: '14px' } },
+            React.createElement('label', { style: { display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' } }, 'Category *'),
+            React.createElement('select', {
+              value: addForm.category, required: true,
+              onChange: function(e) { setAddForm(function(f) { return Object.assign({}, f, { category: e.target.value }); }); },
+              style: { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }
+            }, VALID_CATEGORIES.map(function(c) {
+              return React.createElement('option', { key: c, value: c }, CATEGORY_LABELS[c] || c);
+            }))
+          ),
+          // Priority
+          React.createElement('div', { style: { marginBottom: '14px' } },
+            React.createElement('label', { style: { display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' } }, 'Priority *'),
+            React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+              VALID_PRIORITIES.map(function(p) {
+                var pColors = { P0: { bg: '#fee2e2', color: '#991b1b' }, P1: { bg: '#fef3c7', color: '#92400e' }, P2: { bg: '#dbeafe', color: '#1e40af' }, P3: { bg: '#f3f4f6', color: '#374151' } };
+                var active = addForm.priority === p;
+                var pc = pColors[p];
+                return React.createElement('button', {
+                  key: p, type: 'button',
+                  onClick: function() { setAddForm(function(f) { return Object.assign({}, f, { priority: p }); }); },
+                  style: { padding: '6px 14px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', border: active ? '2px solid ' + pc.color : '2px solid #e5e7eb', backgroundColor: active ? pc.bg : '#fff', color: active ? pc.color : '#6b7280', cursor: 'pointer' }
+                }, p);
+              })
+            )
+          ),
+          // Title
+          React.createElement('div', { style: { marginBottom: '14px' } },
+            React.createElement('label', { style: { display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' } }, 'Title *'),
+            React.createElement('input', {
+              value: addForm.title, required: true, minLength: 5, maxLength: 120,
+              placeholder: 'E.g. Login with valid credentials succeeds',
+              onChange: function(e) { setAddForm(function(f) { return Object.assign({}, f, { title: e.target.value }); }); },
+              style: { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }
+            })
+          ),
+          // Summary
+          React.createElement('div', { style: { marginBottom: '14px' } },
+            React.createElement('label', { style: { display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' } }, 'Summary'),
+            React.createElement('textarea', {
+              value: addForm.summary, rows: 2, maxLength: 300,
+              placeholder: 'Brief description of what this scenario tests and why it matters',
+              onChange: function(e) { setAddForm(function(f) { return Object.assign({}, f, { summary: e.target.value }); }); },
+              style: { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box' }
+            })
+          ),
+          // Preconditions
+          React.createElement('div', { style: { marginBottom: '14px' } },
+            React.createElement('label', { style: { display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' } }, 'Preconditions (one per line)'),
+            React.createElement('textarea', {
+              value: addForm.preconditions, rows: 3,
+              placeholder: 'User is authenticated\nTest record exists in DB',
+              onChange: function(e) { setAddForm(function(f) { return Object.assign({}, f, { preconditions: e.target.value }); }); },
+              style: { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', resize: 'vertical', fontFamily: 'monospace', boxSizing: 'border-box' }
+            })
+          ),
+          // Test Intent
+          React.createElement('div', { style: { marginBottom: '14px' } },
+            React.createElement('label', { style: { display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' } }, 'Test Intent'),
+            React.createElement('input', {
+              value: addForm.test_intent, maxLength: 200,
+              placeholder: 'Business risk or compliance requirement being validated',
+              onChange: function(e) { setAddForm(function(f) { return Object.assign({}, f, { test_intent: e.target.value }); }); },
+              style: { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }
+            })
+          ),
+          // Expected Outcome
+          React.createElement('div', { style: { marginBottom: '20px' } },
+            React.createElement('label', { style: { display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' } }, 'Expected Outcome *'),
+            React.createElement('textarea', {
+              value: addForm.expected_outcome, required: true, rows: 3, minLength: 5, maxLength: 300,
+              placeholder: 'Specific, verifiable result — e.g. "Dashboard shows success banner. Record saved in DB."',
+              onChange: function(e) { setAddForm(function(f) { return Object.assign({}, f, { expected_outcome: e.target.value }); }); },
+              style: { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box' }
+            })
+          ),
+          addError && React.createElement('div', { style: { backgroundColor: '#fee2e2', color: '#991b1b', padding: '10px 14px', borderRadius: '6px', fontSize: '13px', marginBottom: '12px' } }, addError),
+          React.createElement('div', { style: { display: 'flex', gap: '10px', justifyContent: 'flex-end' } },
+            React.createElement('button', {
+              type: 'button',
+              onClick: function() { setShowAddModal(false); setAddError(''); },
+              style: { padding: '9px 18px', borderRadius: '6px', border: '1px solid #d1d5db', backgroundColor: '#fff', fontSize: '14px', cursor: 'pointer' }
+            }, 'Cancel'),
+            React.createElement('button', {
+              type: 'submit', disabled: addSaving,
+              style: { padding: '9px 18px', borderRadius: '6px', border: 'none', backgroundColor: '#2563eb', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: addSaving ? 'not-allowed' : 'pointer', opacity: addSaving ? 0.7 : 1 }
+            }, addSaving ? 'Saving...' : 'Add Scenario')
+          )
+        )
+      )
+    ),
 
     // Scenario groups
     Object.entries(grouped).map(function(entry) {

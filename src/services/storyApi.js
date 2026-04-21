@@ -88,6 +88,14 @@ export async function listScenarios(projectId, storyId) {
   return res.json();
 }
 
+export async function createScenario(projectId, storyId, data) {
+  const res = await fetchWithRetry(
+    API_BASE + '/api/projects/' + projectId + '/stories/' + storyId + '/scenarios',
+    { method: 'POST', body: JSON.stringify(data) }
+  );
+  return res.json();
+}
+
 export async function updateScenarioStatus(projectId, storyId, scenarioId, status, reviewNote) {
   const res = await fetchWithRetry(
     API_BASE + '/api/projects/' + projectId + '/stories/' + storyId + '/scenarios/' + scenarioId,
