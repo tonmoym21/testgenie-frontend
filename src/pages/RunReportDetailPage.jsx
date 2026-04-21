@@ -187,7 +187,7 @@ export default function RunReportDetailPage() {
     return (
       <div className="p-8 text-center">
         <p className="text-gray-500">{error || 'Report not found'}</p>
-        <Link to="/reports" className="text-brand-600 text-sm mt-2 inline-block">Back to reports</Link>
+        <Link to="/executions" className="text-brand-600 text-sm mt-2 inline-block">Back to reports</Link>
       </div>
     );
   }
@@ -198,7 +198,7 @@ export default function RunReportDetailPage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <Link to="/reports" className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-3">
+      <Link to="/executions" className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-3">
         <ArrowLeft size={14} /> Back to Reports
       </Link>
 

@@ -510,6 +510,8 @@ export default function CollectionDetailPage() {
   const [runResults, setRunResults] = useState({});
   const [expandedTests, setExpandedTests] = useState({});
   const [runDone, setRunDone] = useState(false);
+  const [runReportId, setRunReportId] = useState(null);
+  const [runningOne, setRunningOne] = useState(null); // testId being run individually
   const eventSourceRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -541,6 +543,24 @@ export default function CollectionDetailPage() {
     setTests((prev) => prev.filter((t) => t.id !== testId));
   };
 
+  // Run a single test in the collection
+  const handleRunOne = async (testId) => {
+    if (runningOne || running) return;
+    setRunningOne(testId);
+    setExpandedTests((prev) => ({ ...prev, [testId]: true }));
+    try {
+      const r = await api.request('POST', `/collections/${collectionId}/tests/${testId}/run`, {});
+      setRunResults((prev) => ({ ...prev, [testId]: r }));
+    } catch (err) {
+      setRunResults((prev) => ({
+        ...prev,
+        [testId]: { testId, status: 'error', error: err.message, duration: 0 },
+      }));
+    } finally {
+      setRunningOne(null);
+    }
+  };
+
   // SSE-based parallel run with live progress
   const handleRunAll = () => {
     if (running || tests.length === 0) return;
@@ -561,6 +581,7 @@ export default function CollectionDetailPage() {
     es.addEventListener('start', (e) => {
       const d = JSON.parse(e.data);
       setRunProgress({ completed: 0, total: d.total });
+      if (d.reportId) setRunReportId(d.reportId);
     });
 
     es.addEventListener('progress', (e) => {
@@ -576,13 +597,17 @@ export default function CollectionDetailPage() {
       const d = JSON.parse(e.data);
       setRunDone(true);
       setRunning(false);
+      if (d.reportId) setRunReportId(d.reportId);
       es.close();
-      // Refresh full results with rawResponse / logs
-      api.request('POST', '/collections/' + collectionId + '/run').then((result) => {
-        const map = {};
-        (result.results || []).forEach((r) => { map[r.testId] = r; });
-        setRunResults(map);
-      }).catch(() => {});
+      // Hydrate detailed rawResponse/logs from the saved run report
+      if (d.reportId) {
+        api.request('GET', `/run-reports/${d.reportId}`).then((report) => {
+          const results = report.testResults || report.results || [];
+          const map = {};
+          results.forEach((r) => { map[r.testId] = r; });
+          setRunResults(map);
+        }).catch(() => {});
+      }
     });
 
     es.addEventListener('error', () => {
@@ -639,8 +664,13 @@ export default function CollectionDetailPage() {
             <span className="font-semibold text-purple-700">Run Complete</span>
             <span className="text-green-600 font-medium">{passedCount} passed</span>
             <span className="text-red-600 font-medium">{failedCount} failed</span>
+            <span className="text-sm text-gray-500">{tests.length > 0 ? Math.round((passedCount / tests.length) * 100) : 0}% pass rate</span>
           </div>
-          <span className="text-sm text-gray-500">{tests.length > 0 ? Math.round((passedCount / tests.length) * 100) : 0}% pass rate</span>
+          {runReportId && (
+            <Link to={`/reports/${runReportId}`} className="text-sm font-medium text-purple-700 hover:text-purple-900 inline-flex items-center gap-1">
+              View full report <ArrowLeft size={14} className="rotate-180" />
+            </Link>
+          )}
         </div>
       )}
 
@@ -682,6 +712,14 @@ export default function CollectionDetailPage() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {result && <span className="text-xs text-gray-400">{result.duration}ms</span>}
+                    <button
+                      onClick={() => handleRunOne(test.id)}
+                      disabled={running || runningOne === test.id}
+                      title="Run this test"
+                      className="p-1.5 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {runningOne === test.id ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                    </button>
                     <button onClick={() => setEditingTest(test.id)} className="p-1.5 text-gray-300 hover:text-purple-500 hover:bg-purple-50 rounded-lg transition-colors"><Edit2 size={14} /></button>
                     <button onClick={() => handleDeleteTest(test.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
                     {result && (

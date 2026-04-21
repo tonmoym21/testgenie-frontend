@@ -56,7 +56,7 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
     (async () => {
       setLoading(true);
       try {
-        const list = await api.request('GET', `/projects/${projectId}/target-app`);
+        const list = await api.request('GET', `/projects/${projectId}/target-config`);
         setConfigs(Array.isArray(list) ? list : []);
         if (asset.target_app_config_id) {
           setSelectedConfigId(asset.target_app_config_id);
@@ -136,7 +136,7 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
 
       let saved;
       if (showNew || !selectedConfigId) {
-        saved = await api.request('POST', `/projects/${projectId}/target-app`, {
+        saved = await api.request('POST', `/projects/${projectId}/target-config`, {
           name: form.name, baseUrl: form.baseUrl, environment: form.environment,
           authType: form.authType, loginUrl: form.loginUrl || undefined,
           authUsernameEnv: form.authUsernameEnv || undefined,
@@ -146,7 +146,7 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
           selectorMap, knownTestids: knownTestidsArr, isDefault: form.isDefault,
         });
       } else {
-        saved = await api.request('PATCH', `/projects/${projectId}/target-app/${selectedConfigId}`, {
+        saved = await api.request('PATCH', `/projects/${projectId}/target-config/${selectedConfigId}`, {
           name: form.name, base_url: form.baseUrl, environment: form.environment,
           auth_type: form.authType, login_url: form.loginUrl || null,
           auth_username_env: form.authUsernameEnv || null,
@@ -161,7 +161,7 @@ function PrerequisitesPanel({ projectId, asset, onSaved }) {
       // Link config to the asset
       const configId = saved.id || selectedConfigId;
       if (configId) {
-        await api.request('PATCH', `/projects/${projectId}/automation/assets/${asset.id}`, {
+        await api.request('PATCH', `/automation-assets/assets/${asset.id}`, {
           target_app_config_id: Number(configId),
         });
       }

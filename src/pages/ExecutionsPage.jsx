@@ -80,7 +80,7 @@ export default function ExecutionsPage() {
                   <div className="flex items-center gap-2">
                     <h3 className="font-medium text-sm">{exec.testName}</h3>
                     <span className="badge bg-gray-100 text-gray-500 flex items-center gap-1">
-                      {TYPE_ICON[exec.testType]} {exec.testType.toUpperCase()}
+                      {TYPE_ICON[exec.testType] || null} {(exec.testType || 'unknown').toUpperCase()}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
