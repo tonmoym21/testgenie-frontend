@@ -88,6 +88,27 @@ export async function listScenarios(projectId, storyId) {
   return res.json();
 }
 
+export async function listManualTestCases(projectId, storyId) {
+  const res = await fetchWithRetry(API_BASE + '/api/projects/' + projectId + '/stories/' + storyId + '/manual-test-cases', {});
+  return res.json();
+}
+
+export async function createManualTestCase(projectId, storyId, data) {
+  const res = await fetchWithRetry(
+    API_BASE + '/api/projects/' + projectId + '/stories/' + storyId + '/manual-test-cases',
+    { method: 'POST', body: JSON.stringify(data) }
+  );
+  return res.json();
+}
+
+export async function deleteManualTestCase(projectId, storyId, tcId) {
+  const res = await fetchWithRetry(
+    API_BASE + '/api/projects/' + projectId + '/stories/' + storyId + '/manual-test-cases/' + tcId,
+    { method: 'DELETE' }
+  );
+  return res.json();
+}
+
 export async function createScenario(projectId, storyId, data) {
   const res = await fetchWithRetry(
     API_BASE + '/api/projects/' + projectId + '/stories/' + storyId + '/scenarios',

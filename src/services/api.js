@@ -248,6 +248,10 @@ class ApiService {
   async batchCreateTestCases(projectId, testCases) { return this.request('POST', `/projects/${projectId}/testcases/batch`, { testCases }); }
   async updateTestCase(projectId, id, data) { return this.request('PATCH', `/projects/${projectId}/testcases/${id}`, data); }
   async deleteTestCase(projectId, id) { return this.request('DELETE', `/projects/${projectId}/testcases/${id}`); }
+  async linkTestCaseToJira(projectId, id, issueKey, issueSummary) { return this.request('POST', `/projects/${projectId}/testcases/${id}/jira-link`, { issueKey, issueSummary }); }
+  async unlinkTestCaseFromJira(projectId, id) { return this.request('DELETE', `/projects/${projectId}/testcases/${id}/jira-link`); }
+  async getJiraIssueTestCases(issueKey) { return this.request('GET', `/jira/issue/${issueKey}/test-cases`); }
+  async syncTestCasesToJira(issueKey) { return this.request('POST', `/jira/issue/${issueKey}/sync-test-cases`); }
 
   // ── Analyze ───────────────────────────────────────────────────────────────
   async analyzeTestCases(projectId, testCaseIds, analysisType) {

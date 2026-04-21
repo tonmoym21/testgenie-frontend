@@ -1,7 +1,7 @@
 import GeneratePlaywrightButton from '../components/GeneratePlaywrightButton';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getStory, listScenarios, updateScenarioStatus, createScenario, getCoverage, exportStoryCsv } from '../services/storyApi';
+import { getStory, listScenarios, updateScenarioStatus, createScenario, getCoverage, exportStoryCsv, listManualTestCases, createManualTestCase, deleteManualTestCase } from '../services/storyApi';
 
 var CATEGORY_LABELS = {
   happy_path: 'Happy Path', negative: 'Negative', edge: 'Edge Cases', validation: 'Validation',
@@ -22,7 +22,18 @@ export default function StoryDetailPage() {
   var [exporting, setExporting] = useState(false);
   var [exportMsg, setExportMsg] = useState(null);
 
-  // Manual scenario creation state
+  // Tab state: 'ai' | 'manual'
+  var [activeTab, setActiveTab] = useState('ai');
+
+  // Manual test cases state
+  var [manualTcs, setManualTcs] = useState([]);
+  var [manualLoading, setManualLoading] = useState(false);
+  var [showManualForm, setShowManualForm] = useState(false);
+  var [manualForm, setManualForm] = useState({ title: '', content: '', priority: 'medium' });
+  var [manualSaving, setManualSaving] = useState(false);
+  var [manualError, setManualError] = useState('');
+
+  // Manual AI scenario creation state
   var [showAddModal, setShowAddModal] = useState(false);
   var [addForm, setAddForm] = useState({ category: 'happy_path', title: '', summary: '', preconditions: '', test_intent: '', expected_outcome: '', priority: 'P1' });
   var [addError, setAddError] = useState('');
@@ -38,6 +49,39 @@ export default function StoryDetailPage() {
   }, [projectId, storyId]);
 
   useEffect(function() { loadData(); }, [loadData]);
+
+  var loadManualTcs = useCallback(async function() {
+    setManualLoading(true);
+    try {
+      var data = await listManualTestCases(projectId, storyId);
+      setManualTcs(Array.isArray(data) ? data : []);
+    } catch (err) { setManualError(err.message); }
+    finally { setManualLoading(false); }
+  }, [projectId, storyId]);
+
+  useEffect(function() {
+    if (activeTab === 'manual') loadManualTcs();
+  }, [activeTab, loadManualTcs]);
+
+  async function handleAddManualTc(e) {
+    e.preventDefault();
+    setManualSaving(true); setManualError('');
+    try {
+      var created = await createManualTestCase(projectId, storyId, manualForm);
+      setManualTcs(function(prev) { return [created].concat(prev); });
+      setShowManualForm(false);
+      setManualForm({ title: '', content: '', priority: 'medium' });
+    } catch (err) { setManualError(err.message); }
+    finally { setManualSaving(false); }
+  }
+
+  async function handleDeleteManualTc(tcId) {
+    if (!window.confirm('Delete this test case?')) return;
+    try {
+      await deleteManualTestCase(projectId, storyId, tcId);
+      setManualTcs(function(prev) { return prev.filter(function(t) { return t.id !== tcId; }); });
+    } catch (err) { alert('Delete failed: ' + err.message); }
+  }
 
   async function handleStatusChange(scenarioId, newStatus) {
     try {
@@ -112,10 +156,117 @@ export default function StoryDetailPage() {
   return React.createElement('div', { style: { maxWidth: '800px', margin: '0 auto', padding: '24px' } },
     React.createElement(Link, { to: '/projects/' + projectId + '/stories', style: { color: '#2563eb', textDecoration: 'none', fontSize: '14px' } }, '\u2190 Back to Stories'),
     React.createElement('h1', { style: { fontSize: '22px', fontWeight: '700', margin: '8px 0 4px' } }, story.title),
-    React.createElement('p', { style: { color: '#4b5563', fontSize: '14px', margin: '0 0 20px', lineHeight: '1.6', whiteSpace: 'pre-wrap' } }, story.description),
+    React.createElement('p', { style: { color: '#4b5563', fontSize: '14px', margin: '0 0 16px', lineHeight: '1.6', whiteSpace: 'pre-wrap' } }, story.description),
 
-    // Summary bar
-    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: '8px', padding: '16px 20px', border: '1px solid #e5e7eb', marginBottom: '16px' } },
+    // Tab switcher
+    React.createElement('div', { style: { display: 'flex', gap: '0', borderBottom: '2px solid #e5e7eb', marginBottom: '20px' } },
+      React.createElement('button', {
+        onClick: function() { setActiveTab('ai'); },
+        style: { padding: '10px 20px', fontSize: '14px', fontWeight: '600', border: 'none', background: 'none', cursor: 'pointer',
+          borderBottom: activeTab === 'ai' ? '2px solid #2563eb' : '2px solid transparent',
+          color: activeTab === 'ai' ? '#2563eb' : '#6b7280', marginBottom: '-2px' }
+      }, '🤖 AI Scenarios (' + scenarios.length + ')'),
+      React.createElement('button', {
+        onClick: function() { setActiveTab('manual'); },
+        style: { padding: '10px 20px', fontSize: '14px', fontWeight: '600', border: 'none', background: 'none', cursor: 'pointer',
+          borderBottom: activeTab === 'manual' ? '2px solid #2563eb' : '2px solid transparent',
+          color: activeTab === 'manual' ? '#2563eb' : '#6b7280', marginBottom: '-2px' }
+      }, '✍️ Manual Test Cases (' + manualTcs.length + ')')
+    ),
+
+    // ── MANUAL TEST CASES TAB ──────────────────────────────────────────────
+    activeTab === 'manual' && React.createElement('div', null,
+      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' } },
+        React.createElement('p', { style: { fontSize: '13px', color: '#6b7280', margin: 0 } }, 'Manual test cases written specifically for this story, visible to your whole organisation.'),
+        React.createElement('button', {
+          onClick: function() { setShowManualForm(true); },
+          style: { backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', padding: '9px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }
+        }, '+ Add Test Case')
+      ),
+
+      // Add manual test case form
+      showManualForm && React.createElement('div', { style: { backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px', marginBottom: '16px' } },
+        React.createElement('h3', { style: { fontSize: '15px', fontWeight: '600', marginBottom: '14px' } }, 'New Manual Test Case'),
+        React.createElement('form', { onSubmit: handleAddManualTc },
+          React.createElement('div', { style: { marginBottom: '12px' } },
+            React.createElement('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' } }, 'Title *'),
+            React.createElement('input', {
+              value: manualForm.title, required: true,
+              placeholder: 'E.g. User can log in with valid credentials',
+              onChange: function(e) { setManualForm(function(f) { return Object.assign({}, f, { title: e.target.value }); }); },
+              style: { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }
+            })
+          ),
+          React.createElement('div', { style: { marginBottom: '12px' } },
+            React.createElement('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' } }, 'Test Steps / Content *'),
+            React.createElement('textarea', {
+              value: manualForm.content, required: true, rows: 5,
+              placeholder: 'Step 1: Navigate to login page\nStep 2: Enter valid credentials\nStep 3: Click Submit\nExpected: User is redirected to dashboard',
+              onChange: function(e) { setManualForm(function(f) { return Object.assign({}, f, { content: e.target.value }); }); },
+              style: { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', fontFamily: 'monospace', resize: 'vertical', boxSizing: 'border-box' }
+            })
+          ),
+          React.createElement('div', { style: { marginBottom: '14px' } },
+            React.createElement('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px' } }, 'Priority'),
+            React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+              ['low', 'medium', 'high', 'critical'].map(function(p) {
+                var colors = { low: '#6b7280', medium: '#d97706', high: '#ea580c', critical: '#dc2626' };
+                var active = manualForm.priority === p;
+                return React.createElement('button', {
+                  key: p, type: 'button',
+                  onClick: function() { setManualForm(function(f) { return Object.assign({}, f, { priority: p }); }); },
+                  style: { padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                    border: '1px solid ' + (active ? colors[p] : '#d1d5db'),
+                    backgroundColor: active ? colors[p] : '#fff',
+                    color: active ? '#fff' : '#6b7280', textTransform: 'capitalize' }
+                }, p);
+              })
+            )
+          ),
+          manualError && React.createElement('p', { style: { color: '#dc2626', fontSize: '13px', marginBottom: '10px' } }, manualError),
+          React.createElement('div', { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end' } },
+            React.createElement('button', { type: 'button', onClick: function() { setShowManualForm(false); setManualError(''); },
+              style: { padding: '8px 16px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#fff', fontSize: '13px', cursor: 'pointer' } }, 'Cancel'),
+            React.createElement('button', { type: 'submit', disabled: manualSaving,
+              style: { padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#2563eb', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer' } },
+              manualSaving ? 'Saving...' : 'Add Test Case')
+          )
+        )
+      ),
+
+      // Manual test cases list
+      manualLoading && React.createElement('p', { style: { textAlign: 'center', color: '#6b7280', padding: '20px' } }, 'Loading...'),
+      !manualLoading && manualTcs.length === 0 && React.createElement('div', {
+        style: { textAlign: 'center', padding: '40px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px dashed #d1d5db' }
+      },
+        React.createElement('p', { style: { color: '#6b7280', fontSize: '14px', margin: 0 } }, 'No manual test cases yet. Add one above.')
+      ),
+      !manualLoading && manualTcs.map(function(tc) {
+        var priorityColors = { low: '#6b7280', medium: '#d97706', high: '#ea580c', critical: '#dc2626' };
+        return React.createElement('div', { key: tc.id, style: { backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '14px', marginBottom: '8px' } },
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } },
+            React.createElement('div', { style: { flex: 1 } },
+              React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' } },
+                React.createElement('span', { style: { fontSize: '11px', fontWeight: '700', color: priorityColors[tc.priority] || '#6b7280', textTransform: 'uppercase' } }, tc.priority),
+                tc.jiraIssueKey && React.createElement('span', { style: { fontSize: '11px', backgroundColor: '#dbeafe', color: '#1d4ed8', padding: '1px 7px', borderRadius: '9999px', fontWeight: '600' } }, '🔗 ' + tc.jiraIssueKey),
+                tc.createdByEmail && React.createElement('span', { style: { fontSize: '11px', color: '#9ca3af' } }, 'by ' + tc.createdByEmail)
+              ),
+              React.createElement('h3', { style: { fontSize: '14px', fontWeight: '600', margin: '0 0 6px' } }, tc.title),
+              React.createElement('pre', { style: { fontSize: '12px', color: '#4b5563', margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'monospace', lineHeight: '1.5' } }, tc.content)
+            ),
+            React.createElement('button', {
+              onClick: function() { handleDeleteManualTc(tc.id); },
+              title: 'Delete',
+              style: { background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '16px', padding: '4px 8px', flexShrink: 0 }
+            }, '🗑')
+          )
+        );
+      })
+    ),
+
+    // ── AI SCENARIOS TAB ───────────────────────────────────────────────────
+    // Summary bar (AI tab only)
+    activeTab === 'ai' && React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: '8px', padding: '16px 20px', border: '1px solid #e5e7eb', marginBottom: '16px' } },
       React.createElement('div', { style: { display: 'flex', gap: '24px' } },
         StatBox('Total', scenarios.length, '#374151'),
         StatBox('Approved', approvedCount, '#16a34a'),
@@ -137,16 +288,16 @@ export default function StoryDetailPage() {
       )
     ),
 
-    // Export message
-    exportMsg && React.createElement('div', {
+    // Export message (AI tab)
+    activeTab === 'ai' && exportMsg && React.createElement('div', {
       style: { padding: '10px 14px', borderRadius: '6px', fontSize: '13px', border: '1px solid', marginBottom: '16px',
         backgroundColor: exportMsg.indexOf('Error') === 0 ? '#fef2f2' : '#f0fdf4',
         color: exportMsg.indexOf('Error') === 0 ? '#dc2626' : '#16a34a',
         borderColor: exportMsg.indexOf('Error') === 0 ? '#fecaca' : '#bbf7d0' }
     }, exportMsg),
 
-    // Missing categories warning
-    coverage && coverage.missingCategories.length > 0 && React.createElement('div', {
+    // Missing categories warning (AI tab)
+    activeTab === 'ai' && coverage && coverage.missingCategories.length > 0 && React.createElement('div', {
       style: { backgroundColor: '#fffbeb', color: '#92400e', padding: '10px 14px', borderRadius: '6px', border: '1px solid #fcd34d', fontSize: '13px', marginBottom: '16px' }
     }, '\u26A0 Missing coverage: ' + coverage.missingCategories.map(function(c) { return CATEGORY_LABELS[c] || c; }).join(', ')),
 
@@ -250,8 +401,8 @@ export default function StoryDetailPage() {
       )
     ),
 
-    // Scenario groups
-    Object.entries(grouped).map(function(entry) {
+    // Scenario groups (AI tab)
+    activeTab === 'ai' && Object.entries(grouped).map(function(entry) {
       var category = entry[0], items = entry[1];
       return React.createElement('div', { key: category, style: { marginBottom: '24px' } },
         React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #e5e7eb', paddingBottom: '8px', marginBottom: '12px' } },
@@ -268,7 +419,7 @@ export default function StoryDetailPage() {
       );
     }),
 
-    scenarios.length === 0 && React.createElement('div', { style: { textAlign: 'center', padding: '40px', color: '#6b7280', backgroundColor: '#f9fafb', borderRadius: '8px' } }, 'No scenarios generated for this story.')
+    activeTab === 'ai' && scenarios.length === 0 && React.createElement('div', { style: { textAlign: 'center', padding: '40px', color: '#6b7280', backgroundColor: '#f9fafb', borderRadius: '8px' } }, 'No scenarios generated for this story.')
   );
 }
 

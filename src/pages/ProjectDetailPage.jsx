@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import {
   ArrowLeft, Plus, Loader2, Trash2, Pencil, Check, X, Zap,
-ChevronDown, AlertTriangle, Search, Copy, Shield, BookOpen
+  ChevronDown, AlertTriangle, Search, Copy, Shield, BookOpen, Link2, ExternalLink,
 } from 'lucide-react';
 import ExportCsvButton from '../components/ExportCsvButton';
 
@@ -50,6 +50,14 @@ export default function ProjectDetailPage() {
   const [editPriority, setEditPriority] = useState('medium');
   const [editStatus, setEditStatus] = useState('draft');
   const [saving, setSaving] = useState(false);
+
+  // Jira link state
+  const [jiraLinkTc, setJiraLinkTc] = useState(null); // test case being linked
+  const [jiraSearch, setJiraSearch] = useState('');
+  const [jiraResults, setJiraResults] = useState([]);
+  const [jiraSearching, setJiraSearching] = useState(false);
+  const [jiraLinking, setJiraLinking] = useState(false);
+  const [jiraError, setJiraError] = useState('');
 
   // Analyze state
   const [showAnalyze, setShowAnalyze] = useState(false);
@@ -143,6 +151,40 @@ export default function ProjectDetailPage() {
     } catch (err) {
       setError(err.message);
     }
+  };
+
+  const handleJiraSearch = async (q) => {
+    setJiraSearch(q);
+    if (q.length < 2) { setJiraResults([]); return; }
+    setJiraSearching(true);
+    try {
+      const res = await api.request('GET', `/jira/search?q=${encodeURIComponent(q)}`);
+      setJiraResults(res.data || []);
+    } catch { setJiraResults([]); }
+    finally { setJiraSearching(false); }
+  };
+
+  const handleJiraLink = async (issue) => {
+    if (!jiraLinkTc) return;
+    setJiraLinking(true); setJiraError('');
+    try {
+      await api.linkTestCaseToJira(projectId, jiraLinkTc.id, issue.key, issue.summary);
+      setTestCases((prev) => prev.map((tc) =>
+        tc.id === jiraLinkTc.id ? { ...tc, jiraIssueKey: issue.key } : tc
+      ));
+      setJiraLinkTc(null); setJiraSearch(''); setJiraResults([]);
+    } catch (err) {
+      setJiraError(err.message);
+    } finally { setJiraLinking(false); }
+  };
+
+  const handleJiraUnlink = async (tc) => {
+    try {
+      await api.unlinkTestCaseFromJira(projectId, tc.id);
+      setTestCases((prev) => prev.map((t) =>
+        t.id === tc.id ? { ...t, jiraIssueKey: null } : t
+      ));
+    } catch (err) { setError(err.message); }
   };
 
   const toggleSelect = (id) => {
@@ -511,6 +553,44 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
+      {/* Jira link modal */}
+      {jiraLinkTc && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <h2 className="text-lg font-semibold mb-1">Link to Jira Issue</h2>
+            <p className="text-sm text-gray-500 mb-4">Linking: <span className="font-medium">{jiraLinkTc.title}</span></p>
+            <input
+              className="input mb-3"
+              placeholder="Search by issue key or title (e.g. PROJ-123)"
+              value={jiraSearch}
+              onChange={(e) => handleJiraSearch(e.target.value)}
+              autoFocus
+            />
+            {jiraSearching && <p className="text-sm text-gray-400 mb-2">Searching...</p>}
+            {jiraResults.length > 0 && (
+              <div className="border rounded-lg divide-y max-h-48 overflow-y-auto mb-3">
+                {jiraResults.map((issue) => (
+                  <button
+                    key={issue.key}
+                    onClick={() => handleJiraLink(issue)}
+                    disabled={jiraLinking}
+                    className="w-full text-left px-3 py-2 hover:bg-brand-50 flex items-center gap-2"
+                  >
+                    <span className="text-xs font-mono font-bold text-blue-700">{issue.key}</span>
+                    <span className="text-sm text-gray-700 truncate">{issue.summary}</span>
+                    <ExternalLink size={12} className="text-gray-400 shrink-0 ml-auto" />
+                  </button>
+                ))}
+              </div>
+            )}
+            {jiraError && <p className="text-sm text-red-600 mb-2">{jiraError}</p>}
+            <div className="flex justify-end gap-2 mt-2">
+              <button className="btn-secondary" onClick={() => { setJiraLinkTc(null); setJiraSearch(''); setJiraResults([]); setJiraError(''); }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Test cases list */}
       {testCases.length === 0 ? (
         <div className="text-center py-20">
@@ -558,6 +638,21 @@ export default function ProjectDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0">
+                  {tc.jiraIssueKey ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
+                      <Link2 size={10} />
+                      {tc.jiraIssueKey}
+                      <button onClick={() => handleJiraUnlink(tc)} className="ml-0.5 hover:text-red-500" title="Remove Jira link">×</button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => { setJiraLinkTc(tc); setJiraSearch(''); setJiraResults([]); setJiraError(''); }}
+                      className="p-1.5 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Link to Jira issue"
+                    >
+                      <Link2 size={14} />
+                    </button>
+                  )}
                   <button
                     onClick={() => openEdit(tc)}
                     className="p-1.5 text-gray-300 hover:text-brand-500 hover:bg-brand-50 rounded-lg transition-colors"
