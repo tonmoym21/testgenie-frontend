@@ -217,7 +217,7 @@ export default function GlobalsPage() {
     : variables;
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="page">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-3">

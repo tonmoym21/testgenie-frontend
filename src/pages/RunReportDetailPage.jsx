@@ -31,7 +31,7 @@ function TestResultRow({ result, isExpanded, onToggle }) {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500">{result.duration || 0}ms</span>
+          <span className="text-sm text-surface-500">{result.duration || 0}ms</span>
           <span className={`text-xs px-2 py-1 rounded-full font-medium ${
             result.status === 'passed' ? 'bg-green-100 text-green-700' :
             result.status === 'error' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
@@ -52,7 +52,7 @@ function TestResultRow({ result, isExpanded, onToggle }) {
           
           {result.rawResponse && (
             <div className="mb-3">
-              <p className="text-xs text-gray-500 mb-2">Response</p>
+              <p className="text-xs text-surface-500 mb-2">Response</p>
               <div className="p-3 bg-gray-100 rounded-lg text-xs font-mono overflow-x-auto">
                 <div className="flex gap-4 mb-2">
                   <span className={`px-2 py-0.5 rounded ${
@@ -61,7 +61,7 @@ function TestResultRow({ result, isExpanded, onToggle }) {
                   }`}>
                     {result.rawResponse.statusCode} {result.rawResponse.statusText}
                   </span>
-                  <span className="text-gray-500">{result.rawResponse.responseTime}ms</span>
+                  <span className="text-surface-500">{result.rawResponse.responseTime}ms</span>
                 </div>
                 {result.rawResponse.body && (
                   <pre className="max-h-40 overflow-auto text-gray-700">
@@ -76,7 +76,7 @@ function TestResultRow({ result, isExpanded, onToggle }) {
           
           {result.assertionResults && result.assertionResults.length > 0 && (
             <div>
-              <p className="text-xs text-gray-500 mb-2">Assertions</p>
+              <p className="text-xs text-surface-500 mb-2">Assertions</p>
               <div className="space-y-1">
                 {result.assertionResults.map((a, i) => (
                   <div key={i} className={`flex items-start gap-2 p-2 rounded ${
@@ -177,29 +177,31 @@ export default function RunReportDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-32">
-        <Loader2 size={24} className="animate-spin text-brand-600" />
+      <div className="page">
+        <div className="card p-6"><div className="skeleton h-6 w-1/2 mb-3" /><div className="skeleton h-4 w-1/3" /></div>
       </div>
     );
   }
 
   if (error || !report) {
     return (
-      <div className="p-8 text-center">
-        <p className="text-gray-500">{error || 'Report not found'}</p>
-        <Link to="/executions" className="text-brand-600 text-sm mt-2 inline-block">Back to reports</Link>
+      <div className="page">
+        <div className="empty">
+          <h3 className="text-lg font-semibold text-surface-800 mb-1">{error || 'Report not found'}</h3>
+          <Link to="/executions" className="btn-secondary mt-4"><ArrowLeft size={14} /> Back to reports</Link>
+        </div>
       </div>
     );
   }
 
-  const passRate = report.totalTests > 0 
-    ? Math.round((report.passedCount / report.totalTests) * 100) 
+  const passRate = report.totalTests > 0
+    ? Math.round((report.passedCount / report.totalTests) * 100)
     : 0;
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      <Link to="/executions" className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-3">
-        <ArrowLeft size={14} /> Back to Reports
+    <div className="page">
+      <Link to="/executions" className="inline-flex items-center gap-1.5 text-sm text-surface-500 hover:text-surface-800 mb-4 transition-colors">
+        <ArrowLeft size={14} /> Back to reports
       </Link>
 
       {/* Header */}
@@ -212,7 +214,7 @@ export default function RunReportDetailPage() {
                <Folder size={20} className="text-yellow-600" />}
               {report.title || 'Test Run Report'}
             </h1>
-            <div className="flex flex-wrap gap-4 mt-3 text-sm text-gray-500">
+            <div className="flex flex-wrap gap-4 mt-3 text-sm text-surface-500">
               <span className="flex items-center gap-1">
                 <Play size={14} /> Triggered: {report.triggeredBy}
               </span>
@@ -253,21 +255,21 @@ export default function RunReportDetailPage() {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="card p-4 text-center">
           <p className="text-3xl font-bold text-gray-700">{report.totalTests}</p>
-          <p className="text-sm text-gray-500">Total Tests</p>
+          <p className="text-sm text-surface-500">Total Tests</p>
         </div>
         <div className="card p-4 text-center">
           <p className="text-3xl font-bold text-green-600">{report.passedCount}</p>
-          <p className="text-sm text-gray-500">Passed</p>
+          <p className="text-sm text-surface-500">Passed</p>
         </div>
         <div className="card p-4 text-center">
           <p className="text-3xl font-bold text-red-600">{report.failedCount}</p>
-          <p className="text-sm text-gray-500">Failed</p>
+          <p className="text-sm text-surface-500">Failed</p>
         </div>
         <div className="card p-4 text-center">
           <p className={`text-3xl font-bold ${passRate >= 80 ? 'text-green-600' : passRate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
             {passRate}%
           </p>
-          <p className="text-sm text-gray-500">Pass Rate</p>
+          <p className="text-sm text-surface-500">Pass Rate</p>
         </div>
       </div>
 
@@ -304,26 +306,26 @@ export default function RunReportDetailPage() {
         <h3 className="font-semibold mb-3">Run Details</h3>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-500">Run Type:</span>
+            <span className="text-surface-500">Run Type:</span>
             <span className="ml-2 font-medium">{report.runType}</span>
           </div>
           <div>
-            <span className="text-gray-500">Status:</span>
+            <span className="text-surface-500">Status:</span>
             <span className={`ml-2 font-medium ${report.status === 'completed' ? 'text-green-600' : 'text-red-600'}`}>
               {report.status}
             </span>
           </div>
           <div>
-            <span className="text-gray-500">Started:</span>
+            <span className="text-surface-500">Started:</span>
             <span className="ml-2">{new Date(report.startedAt).toLocaleString()}</span>
           </div>
           <div>
-            <span className="text-gray-500">Completed:</span>
+            <span className="text-surface-500">Completed:</span>
             <span className="ml-2">{report.completedAt ? new Date(report.completedAt).toLocaleString() : '-'}</span>
           </div>
           {report.environmentSnapshot && Object.keys(report.environmentSnapshot).length > 0 && (
             <div className="col-span-2">
-              <span className="text-gray-500">Environment Variables:</span>
+              <span className="text-surface-500">Environment Variables:</span>
               <div className="mt-2 p-3 bg-gray-50 rounded-lg">
                 <div className="flex flex-wrap gap-2">
                   {Object.keys(report.environmentSnapshot).map(key => (

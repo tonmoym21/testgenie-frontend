@@ -9,7 +9,7 @@ import {
 
 // Simple mini chart component
 function MiniTrendChart({ data, color = '#6366f1' }) {
-  if (!data || data.length === 0) return <div className="w-24 h-8 bg-gray-100 rounded" />;
+  if (!data || data.length === 0) return <div className="w-24 h-8 bg-surface-100 rounded" />;
   
   const max = Math.max(...data.map(d => d.total || 0), 1);
   const width = 96;
@@ -40,9 +40,9 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'brand' }
     <div className="card p-5">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-gray-500">{title}</p>
+          <p className="text-sm text-surface-500">{title}</p>
           <p className="text-2xl font-bold mt-1">{value}</p>
-          {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
+          {subtitle && <p className="text-xs text-surface-400 mt-1">{subtitle}</p>}
         </div>
         <div className={`p-2.5 rounded-xl ${colorClasses[color]}`}>
           <Icon size={20} />
@@ -61,7 +61,7 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'brand' }
 function RecentRunsTable({ runs }) {
   if (!runs || runs.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-400">
+      <div className="text-center py-8 text-surface-400">
         <Globe size={32} className="mx-auto mb-2 opacity-50" />
         <p className="text-sm">No API runs yet</p>
       </div>
@@ -72,19 +72,19 @@ function RecentRunsTable({ runs }) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-100">
-            <th className="text-left py-3 px-4 text-gray-500 font-medium">Test</th>
-            <th className="text-left py-3 px-4 text-gray-500 font-medium">Status</th>
-            <th className="text-left py-3 px-4 text-gray-500 font-medium">Response</th>
-            <th className="text-left py-3 px-4 text-gray-500 font-medium">Duration</th>
-            <th className="text-left py-3 px-4 text-gray-500 font-medium">Time</th>
+          <tr className="border-b border-surface-100">
+            <th className="text-left py-3 px-4 text-surface-500 font-medium">Test</th>
+            <th className="text-left py-3 px-4 text-surface-500 font-medium">Status</th>
+            <th className="text-left py-3 px-4 text-surface-500 font-medium">Response</th>
+            <th className="text-left py-3 px-4 text-surface-500 font-medium">Duration</th>
+            <th className="text-left py-3 px-4 text-surface-500 font-medium">Time</th>
           </tr>
         </thead>
         <tbody>
           {runs.map((run) => (
-            <tr key={run.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+            <tr key={run.id} className="border-b border-gray-50 hover:bg-surface-50/50">
               <td className="py-3 px-4">
-                <Link to={`/executions/${run.id}`} className="font-medium text-gray-700 hover:text-brand-600">
+                <Link to={`/executions/${run.id}`} className="font-medium text-surface-700 hover:text-brand-600">
                   {run.testName}
                 </Link>
               </td>
@@ -106,8 +106,8 @@ function RecentRunsTable({ runs }) {
                   </span>
                 )}
               </td>
-              <td className="py-3 px-4 text-gray-500">{run.durationMs}ms</td>
-              <td className="py-3 px-4 text-gray-400 text-xs">
+              <td className="py-3 px-4 text-surface-500">{run.durationMs}ms</td>
+              <td className="py-3 px-4 text-surface-400 text-xs">
                 {run.completedAt ? new Date(run.completedAt).toLocaleString() : '-'}
               </td>
             </tr>
@@ -121,7 +121,7 @@ function RecentRunsTable({ runs }) {
 function TopFailuresCard({ failures }) {
   if (!failures || failures.length === 0) {
     return (
-      <div className="text-center py-6 text-gray-400">
+      <div className="text-center py-6 text-surface-400">
         <CheckCircle size={24} className="mx-auto mb-2 opacity-50" />
         <p className="text-sm">No failures this week</p>
       </div>
@@ -132,7 +132,7 @@ function TopFailuresCard({ failures }) {
     <div className="space-y-3">
       {failures.map((f, i) => (
         <div key={i} className="flex items-center justify-between p-3 bg-red-50/50 rounded-lg">
-          <span className="text-sm font-medium text-gray-700 truncate flex-1">{f.testName}</span>
+          <span className="text-sm font-medium text-surface-700 truncate flex-1">{f.testName}</span>
           <span className="text-sm font-bold text-red-600 ml-2">{f.failures} failures</span>
         </div>
       ))}
@@ -189,7 +189,7 @@ export default function ApiDashboardPage() {
   const { summary, dailyTrend, recentRuns, topFailures, topCollections, hourlyDistribution } = metrics || {};
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="page max-w-none">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -197,7 +197,7 @@ export default function ApiDashboardPage() {
             <Globe className="text-purple-600" />
             API Testing Dashboard
           </h1>
-          <p className="text-gray-500 text-sm mt-1">Monitor your API test executions and performance</p>
+          <p className="text-surface-500 text-sm mt-1">Monitor your API test executions and performance</p>
         </div>
         <div className="flex gap-3">
           <button 
@@ -271,11 +271,11 @@ export default function ApiDashboardPage() {
               })}
             </div>
           ) : (
-            <div className="h-48 flex items-center justify-center text-gray-400">
+            <div className="h-48 flex items-center justify-center text-surface-400">
               <p className="text-sm">No data available</p>
             </div>
           )}
-          <div className="flex items-center gap-4 mt-4 text-xs text-gray-500">
+          <div className="flex items-center gap-4 mt-4 text-xs text-surface-500">
             <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-400" /> Passed</span>
             <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-red-400" /> Failed</span>
           </div>
@@ -295,7 +295,7 @@ export default function ApiDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Runs */}
         <div className="card lg:col-span-2">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
             <h3 className="font-semibold">Recent API Runs</h3>
             <Link to="/executions" className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-1">
               View all <ArrowRight size={14} />
@@ -313,17 +313,17 @@ export default function ApiDashboardPage() {
                 <Link 
                   key={col.id} 
                   to={`/collections/${col.id}`}
-                  className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="block p-3 bg-surface-50 rounded-lg hover:bg-surface-100 transition-colors"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-gray-700">{col.name}</span>
-                    <span className="text-xs text-gray-500">{col.test_count} tests</span>
+                    <span className="font-medium text-surface-700">{col.name}</span>
+                    <span className="text-xs text-surface-500">{col.test_count} tests</span>
                   </div>
                 </Link>
               ))}
             </div>
           ) : (
-            <div className="text-center py-6 text-gray-400">
+            <div className="text-center py-6 text-surface-400">
               <p className="text-sm">No collections yet</p>
               <Link to="/collections" className="text-sm text-brand-600 mt-2 inline-block">Create one</Link>
             </div>

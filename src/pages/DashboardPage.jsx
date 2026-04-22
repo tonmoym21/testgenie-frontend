@@ -2,15 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import {
-  Activity, CheckCircle, XCircle, Clock, TrendingUp, TrendingDown,
+  Activity, CheckCircle2, XCircle, Clock, TrendingUp, TrendingDown,
   AlertTriangle, Loader2, Globe, Monitor, Calendar, FolderOpen,
-  RefreshCw, Play, ArrowRight, BarChart3, Users
+  RefreshCw, Play, ArrowRight, BarChart3, Users, Sparkles, Zap
 } from 'lucide-react';
 
 import AlertsBanner from '../components/dashboard/AlertsBanner';
 import FailureTrends from '../components/dashboard/FailureTrends';
 
-// Safe default shape — matches what backend returns in empty state
 const EMPTY_METRICS = {
   summary: { totalRuns: 0, passed: 0, failed: 0, running: 0, passRate: 0, avgDuration: 0 },
   byType: {},
@@ -21,29 +20,29 @@ const EMPTY_METRICS = {
   collections: 0,
 };
 
-function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'brand', to }) {
-  const colorClasses = {
-    brand: 'bg-brand-50 text-brand-600',
-    green: 'bg-green-50 text-green-600',
-    red: 'bg-red-50 text-red-600',
-    yellow: 'bg-yellow-50 text-yellow-600',
-    purple: 'bg-purple-50 text-purple-600',
+function StatCard({ title, value, subtitle, icon: Icon, trend, tone = 'brand', to }) {
+  const tones = {
+    brand:   'from-brand-500/10 to-brand-500/0 text-brand-600 ring-brand-600/10',
+    success: 'from-emerald-500/10 to-emerald-500/0 text-emerald-600 ring-emerald-600/10',
+    danger:  'from-red-500/10 to-red-500/0 text-red-600 ring-red-600/10',
+    warn:    'from-amber-500/10 to-amber-500/0 text-amber-600 ring-amber-600/10',
+    purple:  'from-purple-500/10 to-purple-500/0 text-purple-600 ring-purple-600/10',
   };
 
-  const content = (
+  const body = (
     <>
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-2xl font-bold mt-1">{value}</p>
-          {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
+          <p className="text-sm text-surface-500">{title}</p>
+          <p className="text-[28px] font-semibold text-surface-900 tracking-tight mt-1 leading-none">{value}</p>
+          {subtitle && <p className="text-xs text-surface-400 mt-2">{subtitle}</p>}
         </div>
-        <div className={`p-2.5 rounded-xl ${colorClasses[color]}`}>
+        <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${tones[tone]} ring-1 ring-inset flex items-center justify-center`}>
           <Icon size={20} />
         </div>
       </div>
       {trend !== undefined && (
-        <div className={`flex items-center gap-1 mt-3 text-xs ${trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        <div className={`flex items-center gap-1 mt-4 text-xs font-medium ${trend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
           {trend >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
           <span>{Math.abs(trend)}% vs last week</span>
         </div>
@@ -52,117 +51,91 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'brand', 
   );
 
   if (to) {
-    return (
-      <Link to={to} className="card p-5 hover:shadow-md transition-shadow">
-        {content}
-      </Link>
-    );
+    return <Link to={to} className="card-interactive p-5 block">{body}</Link>;
   }
-
-  return <div className="card p-5">{content}</div>;
+  return <div className="card p-5">{body}</div>;
 }
 
-function TeamActivityFeed({ activities }) {
+function SkeletonCard() {
+  return (
+    <div className="card p-5">
+      <div className="flex items-start justify-between">
+        <div className="flex-1 space-y-3">
+          <div className="skeleton h-3 w-20" />
+          <div className="skeleton h-7 w-16" />
+          <div className="skeleton h-3 w-24" />
+        </div>
+        <div className="skeleton h-11 w-11 rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
+function QuickActionCard({ to, icon: Icon, title, subtitle, tone = 'brand' }) {
+  const tones = {
+    brand:   'bg-brand-50 text-brand-600 group-hover:bg-brand-100',
+    purple:  'bg-purple-50 text-purple-600 group-hover:bg-purple-100',
+    success: 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100',
+    warn:    'bg-amber-50 text-amber-600 group-hover:bg-amber-100',
+  };
+  return (
+    <Link to={to} className="card-interactive p-4 flex items-center gap-3 group">
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${tones[tone]}`}>
+        <Icon size={18} />
+      </div>
+      <div className="min-w-0">
+        <p className="font-semibold text-sm text-surface-800 truncate">{title}</p>
+        <p className="text-xs text-surface-500 truncate">{subtitle}</p>
+      </div>
+      <ArrowRight size={15} className="ml-auto text-surface-300 group-hover:text-brand-500 transition-colors" />
+    </Link>
+  );
+}
+
+function ActivityFeed({ activities }) {
   if (!activities || activities.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-400">
-        <Users size={32} className="mx-auto mb-2 opacity-50" />
+      <div className="text-center py-10 text-surface-400">
+        <Users size={28} className="mx-auto mb-2 opacity-40" />
         <p className="text-sm">No recent activity</p>
+        <p className="text-xs text-surface-400 mt-1">Run a test to see activity here</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {activities.map((activity) => (
-        <div key={activity.id} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-          <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xs font-medium">
-            {activity.avatar}
+    <ul className="divide-y divide-surface-100">
+      {activities.map((a) => (
+        <li key={a.id} className="flex items-start gap-3 py-3 px-1">
+          <div className="w-8 h-8 rounded-full bg-gradient-brand text-white flex items-center justify-center text-xs font-semibold shrink-0">
+            {a.avatar || (a.user || '?').charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm">
-              <span className="font-medium text-gray-700">{activity.user}</span>
-              <span className="text-gray-500"> {activity.action} </span>
-              <Link to={`/executions/${activity.id}`} className="font-medium text-brand-600 hover:text-brand-700 truncate inline-block max-w-[200px] align-bottom">
-                {activity.target}
+            <p className="text-sm text-surface-700">
+              <span className="font-medium text-surface-900">{a.user}</span>
+              <span className="text-surface-500"> {a.action} </span>
+              <Link to={`/executions/${a.id}`} className="font-medium text-brand-600 hover:text-brand-700 truncate inline-block max-w-[220px] align-bottom">
+                {a.target}
               </Link>
             </p>
             <div className="flex items-center gap-2 mt-1">
-              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                activity.result === 'passed' ? 'bg-green-100 text-green-700' :
-                activity.result === 'failed' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
-              }`}>
-                {activity.result}
+              <span className={a.result === 'passed' ? 'badge-success' : a.result === 'failed' ? 'badge-danger' : 'badge-muted'}>
+                {a.result}
               </span>
-              <span className="text-xs text-gray-400">
-                {activity.time ? new Date(activity.time).toLocaleTimeString() : 'Just now'}
+              <span className="text-xs text-surface-400">
+                {a.time ? new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
               </span>
             </div>
           </div>
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
-function QuickActions() {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <Link to="/run-test" className="card p-4 hover:shadow-md transition-shadow group">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-brand-50 text-brand-600 group-hover:bg-brand-100 transition-colors">
-            <Play size={18} />
-          </div>
-          <div>
-            <p className="font-medium text-gray-700">Run Test</p>
-            <p className="text-xs text-gray-400">Execute a test now</p>
-          </div>
-        </div>
-      </Link>
-      <Link to="/collections" className="card p-4 hover:shadow-md transition-shadow group">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-purple-50 text-purple-600 group-hover:bg-purple-100 transition-colors">
-            <FolderOpen size={18} />
-          </div>
-          <div>
-            <p className="font-medium text-gray-700">Collections</p>
-            <p className="text-xs text-gray-400">Organize tests</p>
-          </div>
-        </div>
-      </Link>
-      <Link to="/schedules" className="card p-4 hover:shadow-md transition-shadow group">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-green-50 text-green-600 group-hover:bg-green-100 transition-colors">
-            <Calendar size={18} />
-          </div>
-          <div>
-            <p className="font-medium text-gray-700">Schedules</p>
-            <p className="text-xs text-gray-400">Automate runs</p>
-          </div>
-        </div>
-      </Link>
-      <Link to="/environments" className="card p-4 hover:shadow-md transition-shadow group">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-yellow-50 text-yellow-600 group-hover:bg-yellow-100 transition-colors">
-            <Globe size={18} />
-          </div>
-          <div>
-            <p className="font-medium text-gray-700">Environments</p>
-            <p className="text-xs text-gray-400">Manage variables</p>
-          </div>
-        </div>
-      </Link>
-    </div>
-  );
-}
-
-/** Fetch one endpoint and return either the data or null (never throws). */
 async function safeGet(path) {
-  try {
-    return await api.request('GET', path);
-  } catch (err) {
-    // 404 from the backend catch-all (route not deployed yet) → treat as empty,
-    // not fatal. Log for diagnostics.
+  try { return await api.request('GET', path); }
+  catch (err) {
     // eslint-disable-next-line no-console
     console.warn(`[dashboard] ${path} failed (${err.status || 'n/a'}): ${err.message}`);
     return null;
@@ -175,26 +148,22 @@ export default function DashboardPage() {
   const [metrics, setMetrics] = useState(EMPTY_METRICS);
   const [alerts, setAlerts] = useState([]);
   const [activity, setActivity] = useState([]);
-  const [sessionError, setSessionError] = useState(null); // only for fatal 401
+  const [sessionError, setSessionError] = useState(null);
   const pollRef = useRef(null);
   const consecutiveFailuresRef = useRef(0);
 
   const loadData = async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
-
     const [metricsData, alertsData, activityData] = await Promise.all([
       safeGet('/dashboard'),
       safeGet('/dashboard/alerts'),
       safeGet('/dashboard/activity'),
     ]);
 
-    // Fatal condition check — if ALL three failed, user may not be authenticated
     const allFailed = metricsData === null && alertsData === null && activityData === null;
-
     if (allFailed) {
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3 && pollRef.current) {
-        // Stop polling to avoid log spam; user can hit Refresh manually
         clearInterval(pollRef.current);
         pollRef.current = null;
         setSessionError('Dashboard is temporarily unavailable. Please refresh the page or check your connection.');
@@ -204,11 +173,9 @@ export default function DashboardPage() {
       setSessionError(null);
     }
 
-    // Always render whatever we successfully got — partial state is better than nothing
     setMetrics(metricsData || EMPTY_METRICS);
     setAlerts(Array.isArray(alertsData?.data) ? alertsData.data : []);
     setActivity(Array.isArray(activityData?.data) ? activityData.data : []);
-
     setLoading(false);
     setRefreshing(false);
   };
@@ -216,187 +183,187 @@ export default function DashboardPage() {
   useEffect(() => {
     loadData();
     pollRef.current = setInterval(() => loadData(false), 30000);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <Loader2 size={32} className="animate-spin text-brand-600" />
-      </div>
-    );
-  }
 
   const { summary, byType, dailyTrend, recentFailures, schedules } = metrics || EMPTY_METRICS;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="page">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="page-header">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-gray-500 text-sm mt-1">Overview of your test execution metrics</p>
+          <h1 className="page-title">Dashboard</h1>
+          <p className="page-subtitle">A live view of your test quality.</p>
         </div>
-        <button
-          onClick={() => loadData(true)}
-          className="btn-secondary"
-          disabled={refreshing}
-        >
-          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => loadData(true)}
+            className="btn-secondary btn-sm"
+            disabled={refreshing || loading}
+            aria-label="Refresh dashboard"
+          >
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+          <Link to="/run-test" className="btn-primary btn-sm">
+            <Sparkles size={14} /> Run a test
+          </Link>
+        </div>
       </div>
 
-      {/* Non-fatal session/connectivity notice */}
       {sessionError && (
-        <div className="mb-6 card p-4 bg-yellow-50 border-yellow-200">
-          <p className="text-sm text-yellow-800">{sessionError}</p>
+        <div role="alert" className="mb-6 card p-4 bg-amber-50/80 border-amber-200">
+          <p className="text-sm text-amber-800">{sessionError}</p>
         </div>
       )}
 
-      {/* Alerts Banner */}
-      {alerts.length > 0 && (
-        <div className="mb-6">
-          <AlertsBanner alerts={alerts} />
-        </div>
-      )}
+      {alerts.length > 0 && <div className="mb-6"><AlertsBanner alerts={alerts} /></div>}
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          title="Total Runs"
-          value={summary?.totalRuns || 0}
-          subtitle={`${summary?.running || 0} running now`}
-          icon={Activity}
-          color="brand"
-        />
-        <StatCard
-          title="Pass Rate"
-          value={`${summary?.passRate || 0}%`}
-          subtitle={`${summary?.passed || 0} passed / ${summary?.failed || 0} failed`}
-          icon={CheckCircle}
-          color="green"
-        />
-        <StatCard
-          title="Avg Duration"
-          value={`${summary?.avgDuration || 0}ms`}
-          icon={Clock}
-          color="yellow"
-        />
-        <StatCard
-          title="Active Schedules"
-          value={schedules?.active || 0}
-          subtitle={`of ${schedules?.total || 0} total`}
-          icon={Calendar}
-          color="purple"
-          to="/schedules"
-        />
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {loading ? (
+          <>
+            <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+          </>
+        ) : (
+          <>
+            <StatCard
+              title="Total runs"
+              value={summary?.totalRuns || 0}
+              subtitle={`${summary?.running || 0} running now`}
+              icon={Activity}
+              tone="brand"
+            />
+            <StatCard
+              title="Pass rate"
+              value={`${summary?.passRate || 0}%`}
+              subtitle={`${summary?.passed || 0} passed · ${summary?.failed || 0} failed`}
+              icon={CheckCircle2}
+              tone="success"
+            />
+            <StatCard
+              title="Avg duration"
+              value={`${summary?.avgDuration || 0}ms`}
+              subtitle="Across completed runs"
+              icon={Clock}
+              tone="warn"
+            />
+            <StatCard
+              title="Active schedules"
+              value={schedules?.active || 0}
+              subtitle={`of ${schedules?.total || 0} total`}
+              icon={Calendar}
+              tone="purple"
+              to="/schedules"
+            />
+          </>
+        )}
       </div>
 
-      {/* Dashboard Links */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-        <Link to="/dashboard/api" className="card p-5 hover:shadow-md transition-shadow group">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-xl bg-purple-50 text-purple-600 group-hover:bg-purple-100 transition-colors">
-                <Globe size={24} />
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-700">API Dashboard</h3>
-                <p className="text-sm text-gray-500">
-                  {byType?.api?.count || 0} runs • {byType?.api?.passed || 0} passed
-                </p>
-              </div>
+      {/* By-type summary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <Link to="/dashboard/api" className="card-interactive p-5 flex items-center justify-between group">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+              <Globe size={22} />
             </div>
-            <ArrowRight size={20} className="text-gray-400 group-hover:text-brand-600 transition-colors" />
+            <div>
+              <h3 className="font-semibold text-surface-900">API tests</h3>
+              <p className="text-sm text-surface-500">
+                {byType?.api?.count || 0} runs · {byType?.api?.passed || 0} passed
+              </p>
+            </div>
           </div>
+          <ArrowRight size={18} className="text-surface-300 group-hover:text-brand-500 transition-colors" />
         </Link>
-        <Link to="/dashboard/automation" className="card p-5 hover:shadow-md transition-shadow group">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-xl bg-brand-50 text-brand-600 group-hover:bg-brand-100 transition-colors">
-                <Monitor size={24} />
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-700">Automation Dashboard</h3>
-                <p className="text-sm text-gray-500">
-                  {byType?.ui?.count || 0} runs • {byType?.ui?.passed || 0} passed
-                </p>
-              </div>
+        <Link to="/dashboard/automation" className="card-interactive p-5 flex items-center justify-between group">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center group-hover:bg-brand-100 transition-colors">
+              <Monitor size={22} />
             </div>
-            <ArrowRight size={20} className="text-gray-400 group-hover:text-brand-600 transition-colors" />
+            <div>
+              <h3 className="font-semibold text-surface-900">UI / Automation</h3>
+              <p className="text-sm text-surface-500">
+                {byType?.ui?.count || 0} runs · {byType?.ui?.passed || 0} passed
+              </p>
+            </div>
           </div>
+          <ArrowRight size={18} className="text-surface-300 group-hover:text-brand-500 transition-colors" />
         </Link>
       </div>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Trend + Quick actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="card p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold flex items-center gap-2">
-              <BarChart3 size={18} className="text-brand-600" />
-              30-Day Trend
+            <h3 className="font-semibold flex items-center gap-2 text-surface-800">
+              <BarChart3 size={16} className="text-brand-600" />
+              30-day trend
             </h3>
-            <Link to="/executions" className="text-sm text-brand-600 hover:text-brand-700">View all →</Link>
+            <Link to="/executions" className="text-sm text-brand-600 hover:text-brand-700 font-medium">
+              View all →
+            </Link>
           </div>
           <FailureTrends dailyTrend={dailyTrend || []} />
         </div>
 
         <div className="card p-5">
-          <h3 className="font-semibold mb-4">Quick Actions</h3>
-          <QuickActions />
+          <h3 className="font-semibold text-surface-800 mb-4">Quick actions</h3>
+          <div className="space-y-2.5">
+            <QuickActionCard to="/run-test"     icon={Zap}        title="Run a test"      subtitle="Execute UI or API right now" tone="brand" />
+            <QuickActionCard to="/collections"  icon={FolderOpen} title="Collections"     subtitle="Organize your test suites"   tone="purple" />
+            <QuickActionCard to="/schedules"    icon={Calendar}   title="Schedules"       subtitle="Automate recurring runs"     tone="success" />
+            <QuickActionCard to="/environments" icon={Globe}      title="Environments"    subtitle="Manage variables & secrets"  tone="warn" />
+          </div>
         </div>
       </div>
 
-      {/* Activity & Recent Failures */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <div className="card">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Users size={18} className="text-gray-500" />
-              Recent Activity
+      {/* Activity + Failures */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
+            <h3 className="font-semibold flex items-center gap-2 text-surface-800">
+              <Users size={16} className="text-surface-500" />
+              Recent activity
             </h3>
           </div>
-          <div className="p-4 max-h-80 overflow-y-auto">
-            <TeamActivityFeed activities={activity} />
+          <div className="px-5 py-2 max-h-80 scroll-area">
+            <ActivityFeed activities={activity} />
           </div>
         </div>
 
-        <div className="card">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-            <h3 className="font-semibold flex items-center gap-2">
-              <AlertTriangle size={18} className="text-red-500" />
-              Recent Failures
+        <div className="card overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
+            <h3 className="font-semibold flex items-center gap-2 text-surface-800">
+              <AlertTriangle size={16} className="text-red-500" />
+              Recent failures
             </h3>
+            <Link to="/executions?status=failed" className="text-xs text-brand-600 hover:text-brand-700 font-medium">View all</Link>
           </div>
-          <div className="p-4 max-h-80 overflow-y-auto">
+          <div className="p-4 max-h-80 scroll-area">
             {recentFailures && recentFailures.length > 0 ? (
-              <div className="space-y-3">
-                {recentFailures.map((failure) => (
+              <div className="space-y-2">
+                {recentFailures.map((f) => (
                   <Link
-                    key={failure.id}
-                    to={`/executions/${failure.id}`}
-                    className="block p-3 bg-red-50/50 hover:bg-red-50 rounded-lg transition-colors"
+                    key={f.id}
+                    to={`/executions/${f.id}`}
+                    className="flex items-start justify-between gap-3 p-3 bg-red-50/60 hover:bg-red-50 rounded-lg transition-colors ring-1 ring-red-600/10"
                   >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-medium text-gray-700">{failure.testName}</p>
-                        <p className="text-xs text-red-600 mt-1 truncate max-w-[300px]">{failure.error}</p>
-                      </div>
-                      <span className="text-xs text-gray-400">
-                        {failure.durationMs}ms
-                      </span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm text-surface-800 truncate">{f.testName}</p>
+                      <p className="text-xs text-red-700 mt-1 truncate">{f.error}</p>
                     </div>
+                    <span className="text-xs text-surface-400 font-mono shrink-0">{f.durationMs}ms</span>
                   </Link>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-400">
-                <CheckCircle size={32} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No recent failures!</p>
+              <div className="text-center py-10 text-surface-400">
+                <CheckCircle2 size={28} className="mx-auto mb-2 text-emerald-500/60" />
+                <p className="text-sm text-surface-500 font-medium">All tests green</p>
+                <p className="text-xs text-surface-400">No recent failures</p>
               </div>
             )}
           </div>

@@ -1,22 +1,41 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
-import { Loader2, CheckCircle, XCircle, Play, Clock, Monitor, Globe } from 'lucide-react';
+import {
+  Loader2, CheckCircle2, XCircle, Play, Clock, Monitor, Globe, Search,
+  ChevronLeft, ChevronRight, Filter
+} from 'lucide-react';
 
-const STATUS_ICON = {
-  passed: <CheckCircle size={16} className="text-green-500" />,
-  failed: <XCircle size={16} className="text-red-500" />,
+const STATUS_META = {
+  passed: { icon: CheckCircle2, cls: 'text-emerald-500', badge: 'badge-success' },
+  failed: { icon: XCircle,     cls: 'text-red-500',     badge: 'badge-danger' },
+  running:{ icon: Loader2,     cls: 'text-brand-500 animate-spin', badge: 'badge-info' },
 };
 
-const TYPE_ICON = {
-  ui: <Monitor size={14} />,
-  api: <Globe size={14} />,
-};
+const TYPE_ICON = { ui: Monitor, api: Globe };
+
+function formatRelative(iso) {
+  if (!iso) return '';
+  const then = new Date(iso).getTime();
+  const diff = Date.now() - then;
+  const m = Math.round(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
 
 export default function ExecutionsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialStatus = searchParams.get('status') || 'all';
+
   const [executions, setExecutions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState(initialStatus);
+  const [query, setQuery] = useState('');
   const [pagination, setPagination] = useState({ page: 1, total: 0 });
 
   const load = useCallback(async () => {
@@ -36,19 +55,57 @@ export default function ExecutionsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (filter === 'all') next.delete('status'); else next.set('status', filter);
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return executions;
+    return executions.filter((e) =>
+      (e.testName + ' ' + (e.error || '') + ' ' + (e.testType || '')).toLowerCase().includes(q)
+    );
+  }, [executions, query]);
+
+  const totalPages = Math.max(1, Math.ceil(pagination.total / 20));
+
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="page">
+      <div className="page-header">
         <div>
-          <h1 className="text-2xl font-semibold">Test Executions</h1>
-          <p className="text-gray-500 text-sm mt-1">History of all test runs</p>
+          <h1 className="page-title">Executions</h1>
+          <p className="page-subtitle">A unified timeline of all your test runs.</p>
         </div>
-        <div className="flex gap-2">
+        <Link to="/run-test" className="btn-primary btn-sm">
+          <Play size={14} /> Run a test
+        </Link>
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
+        <div className="relative flex-1 max-w-md">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search executions…"
+            className="input pl-9 py-2"
+          />
+        </div>
+        <div className="inline-flex items-center p-1 rounded-lg bg-surface-100">
+          <Filter size={13} className="text-surface-400 ml-1.5 mr-1" />
           {['all', 'passed', 'failed'].map((f) => (
             <button
               key={f}
               onClick={() => { setFilter(f); setPagination((p) => ({ ...p, page: 1 })); }}
-              className={`btn text-xs capitalize ${filter === f ? 'btn-primary' : 'btn-secondary'}`}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-colors ${
+                filter === f ? 'bg-white text-surface-900 shadow-soft' : 'text-surface-500 hover:text-surface-800'
+              }`}
+              aria-pressed={filter === f}
             >
               {f}
             </button>
@@ -56,67 +113,101 @@ export default function ExecutionsPage() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 size={24} className="animate-spin text-brand-600" />
-        </div>
-      ) : executions.length === 0 ? (
-        <div className="text-center py-20">
-          <Play size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-600 mb-1">No executions yet</h3>
-          <p className="text-gray-400 text-sm">Run a test via the API to see results here</p>
-        </div>
-      ) : (
+      {/* Loading */}
+      {loading && (
         <div className="space-y-2">
-          {executions.map((exec) => (
-            <Link
-              key={exec.id}
-              to={`/executions/${exec.id}`}
-              className="card p-4 flex items-center justify-between hover:border-brand-300 hover:shadow-md transition-all group"
-            >
+          {[1,2,3,4,5].map((i) => (
+            <div key={i} className="card p-4">
               <div className="flex items-center gap-3">
-                {STATUS_ICON[exec.status] || <Clock size={16} className="text-gray-400" />}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium text-sm">{exec.testName}</h3>
-                    <span className="badge bg-gray-100 text-gray-500 flex items-center gap-1">
-                      {TYPE_ICON[exec.testType] || null} {(exec.testType || 'unknown').toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
-                    <span>{exec.durationMs}ms</span>
-                    <span>{new Date(exec.completedAt).toLocaleString()}</span>
-                    {exec.error && <span className="text-red-400 truncate max-w-xs">{exec.error}</span>}
-                  </div>
+                <div className="skeleton w-5 h-5 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <div className="skeleton h-3.5 w-2/5" />
+                  <div className="skeleton h-2.5 w-3/5" />
                 </div>
+                <div className="skeleton h-5 w-16 rounded-full" />
               </div>
-              <span className={`badge ${exec.status === 'passed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                {exec.status}
-              </span>
-            </Link>
+            </div>
           ))}
         </div>
       )}
 
-      {pagination.total > 20 && (
-        <div className="flex justify-center gap-2 mt-6">
-          <button
-            onClick={() => setPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }))}
-            disabled={pagination.page === 1}
-            className="btn-secondary text-xs"
-          >
-            Previous
-          </button>
-          <span className="text-sm text-gray-400 py-2">
-            Page {pagination.page} of {Math.ceil(pagination.total / 20)}
+      {/* Empty */}
+      {!loading && filtered.length === 0 && (
+        <div className="empty">
+          <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4">
+            <Play size={22} />
+          </div>
+          <h3 className="text-lg font-semibold text-surface-800 mb-1">No executions yet</h3>
+          <p className="text-surface-500 text-sm max-w-xs mb-6">
+            {query ? `No executions match "${query}".` : 'Run your first test to start building a history.'}
+          </p>
+          <Link to="/run-test" className="btn-primary"><Play size={14} /> Run a test</Link>
+        </div>
+      )}
+
+      {/* List */}
+      {!loading && filtered.length > 0 && (
+        <div className="card divide-y divide-surface-100 overflow-hidden">
+          {filtered.map((exec) => {
+            const meta = STATUS_META[exec.status] || STATUS_META.running;
+            const StatusIcon = meta.icon;
+            const TypeIcon = TYPE_ICON[exec.testType] || Clock;
+            return (
+              <Link
+                key={exec.id}
+                to={`/executions/${exec.id}`}
+                className="flex items-center gap-4 px-5 py-4 hover:bg-surface-50 transition-colors group"
+              >
+                <StatusIcon size={18} className={meta.cls} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-medium text-sm text-surface-900 truncate">{exec.testName}</h3>
+                    <span className="badge-muted inline-flex items-center gap-1">
+                      <TypeIcon size={10} /> {(exec.testType || 'unknown').toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 text-xs text-surface-500">
+                    <span className="font-mono">{exec.durationMs}ms</span>
+                    <span>·</span>
+                    <span>{formatRelative(exec.completedAt)}</span>
+                    {exec.error && (
+                      <>
+                        <span>·</span>
+                        <span className="text-red-600 truncate max-w-[40ch]" title={exec.error}>{exec.error}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <span className={meta.badge}>{exec.status}</span>
+                <ChevronRight size={15} className="text-surface-300 group-hover:text-brand-500 transition-colors" />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {pagination.total > 20 && !loading && (
+        <div className="flex items-center justify-between mt-5">
+          <span className="text-xs text-surface-500">
+            Page {pagination.page} of {totalPages} · {pagination.total} total
           </span>
-          <button
-            onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
-            disabled={pagination.page >= Math.ceil(pagination.total / 20)}
-            className="btn-secondary text-xs"
-          >
-            Next
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }))}
+              disabled={pagination.page === 1}
+              className="btn-secondary btn-sm"
+            >
+              <ChevronLeft size={14} /> Previous
+            </button>
+            <button
+              onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
+              disabled={pagination.page >= totalPages}
+              className="btn-secondary btn-sm"
+            >
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
         </div>
       )}
     </div>

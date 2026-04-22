@@ -44,7 +44,7 @@ export default function App() {
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
-      {/* Dashboard routes */}
+      {/* Dashboard routes (sub-dashboards still accessible via deep links) */}
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/dashboard/api" element={<ProtectedRoute><ApiDashboardPage /></ProtectedRoute>} />
       <Route path="/dashboard/automation" element={<ProtectedRoute><AutomationDashboardPage /></ProtectedRoute>} />

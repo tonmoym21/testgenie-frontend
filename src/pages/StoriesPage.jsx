@@ -1,126 +1,138 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Plus, BookOpen, ArrowLeft, X, ChevronRight } from 'lucide-react';
 import { listStories, listProjects, deleteStory } from '../services/storyApi';
+
+const STATUS_STYLES = {
+  draft: 'badge-muted',
+  extracted: 'badge-info',
+  reviewed: 'badge-success',
+  exported: 'badge bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-600/15',
+};
 
 export default function StoriesPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const [stories, setStories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(function() {
+  const loadStories = useCallback(async () => {
+    try { setLoading(true); setError(''); setStories(await listStories(projectId)); }
+    catch (err) { setError(err.message); }
+    finally { setLoading(false); }
+  }, [projectId]);
+
+  useEffect(() => {
     if (!projectId) {
       setLoading(true);
-      listProjects()
-        .then(function(data) { setProjects(data); setLoading(false); })
-        .catch(function(e) { setError(e.message); setLoading(false); });
+      listProjects().then((d) => { setProjects(d); setLoading(false); })
+        .catch((e) => { setError(e.message); setLoading(false); });
     } else {
       loadStories();
     }
-  }, [projectId]);
+  }, [projectId, loadStories]);
 
-  async function loadStories() {
+  const handleDelete = async (e, id) => {
+    e.stopPropagation();
+    if (!confirm('Delete this story and all its scenarios?')) return;
     try {
-      setLoading(true); setError(null);
-      var data = await listStories(projectId);
-      setStories(data);
+      await deleteStory(projectId, id);
+      setStories((prev) => prev.filter((s) => s.id !== id));
     } catch (err) { setError(err.message); }
-    finally { setLoading(false); }
-  }
-
-  async function handleDelete(storyId) {
-    if (!window.confirm('Delete this story and all its scenarios?')) return;
-    try {
-      await deleteStory(projectId, storyId);
-      setStories(function(prev) { return prev.filter(function(s) { return s.id !== storyId; }); });
-    } catch (err) { alert('Failed to delete: ' + err.message); }
-  }
-
-  var statusColors = { draft: '#6b7280', extracted: '#2563eb', reviewed: '#16a34a', exported: '#7c3aed' };
+  };
 
   if (!projectId) {
-    if (loading) return React.createElement('div', { style: { textAlign: 'center', padding: '40px', color: '#6b7280' } }, 'Loading projects...');
-    if (error) return React.createElement('div', { style: { textAlign: 'center', padding: '40px', color: '#dc2626' } }, 'Error: ' + error);
-    return React.createElement('div', { style: { maxWidth: '800px', margin: '0 auto', padding: '24px' } },
-      React.createElement('h1', { style: { fontSize: '24px', fontWeight: '700', marginBottom: '16px' } }, 'Select a Project'),
-      React.createElement('p', { style: { color: '#6b7280', marginBottom: '24px' } }, 'Choose a project to view its user stories.'),
-      projects.length === 0
-        ? React.createElement('div', { style: { textAlign: 'center', padding: '40px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px dashed #d1d5db' } },
-            React.createElement('p', { style: { color: '#6b7280', marginBottom: '12px' } }, 'No projects found.'),
-            React.createElement('button', {
-              style: { backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 18px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
-              onClick: function() { navigate('/projects'); }
-            }, 'Go to Projects')
-          )
-        : React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-            projects.map(function(p) {
-              return React.createElement('div', {
-                key: p.id,
-                style: { padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', backgroundColor: '#fff' },
-                onClick: function() { navigate('/projects/' + p.id + '/stories'); }
-              },
-                React.createElement('h3', { style: { margin: 0, fontSize: '16px', fontWeight: '600' } }, p.name),
-                React.createElement('p', { style: { margin: '4px 0 0', color: '#6b7280', fontSize: '14px' } }, p.description || '')
-              );
-            })
-          )
+    return (
+      <div className="page">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Select a project</h1>
+            <p className="page-subtitle">Choose a project to view its user stories.</p>
+          </div>
+        </div>
+        {loading && <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="card p-5"><div className="skeleton h-4 w-1/3" /></div>)}</div>}
+        {error && <div role="alert" className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg border border-red-200 mb-6">{error}</div>}
+        {!loading && projects.length === 0 && (
+          <div className="empty">
+            <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4"><BookOpen size={24} /></div>
+            <h3 className="text-lg font-semibold text-surface-800 mb-1">No projects found</h3>
+            <button onClick={() => navigate('/projects')} className="btn-primary mt-4">Go to projects</button>
+          </div>
+        )}
+        {!loading && projects.length > 0 && (
+          <div className="card divide-y divide-surface-100 overflow-hidden">
+            {projects.map((p) => (
+              <button key={p.id} onClick={() => navigate('/projects/' + p.id + '/stories')}
+                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-surface-50 transition-colors text-left group">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-purple-600 text-white flex items-center justify-center shrink-0"><BookOpen size={18} /></div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-surface-900 truncate">{p.name}</h3>
+                  {p.description && <p className="text-xs text-surface-500 truncate mt-0.5">{p.description}</p>}
+                </div>
+                <ChevronRight size={16} className="text-surface-300 group-hover:text-brand-500 transition-colors" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     );
   }
 
-  if (loading) return React.createElement('div', { style: { textAlign: 'center', padding: '40px', color: '#6b7280' } }, 'Loading stories...');
-  if (error) return React.createElement('div', { style: { textAlign: 'center', padding: '40px', color: '#dc2626' } }, 'Error: ' + error);
+  return (
+    <div className="page">
+      <Link to={'/projects/' + projectId} className="inline-flex items-center gap-1.5 text-sm text-surface-500 hover:text-surface-800 mb-4 transition-colors">
+        <ArrowLeft size={14} /> Back to project
+      </Link>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">User stories</h1>
+          <p className="page-subtitle">Submit user stories to generate test scenarios and export CSV.</p>
+        </div>
+        <button onClick={() => navigate('/projects/' + projectId + '/stories/new')} className="btn-primary">
+          <Plus size={16} /> New story
+        </button>
+      </div>
 
-  return React.createElement('div', { style: { maxWidth: '800px', margin: '0 auto', padding: '24px' } },
-    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' } },
-      React.createElement('div', null,
-        React.createElement(Link, { to: '/projects/' + projectId, style: { color: '#2563eb', textDecoration: 'none', fontSize: '14px' } }, '\u2190 Back to Project'),
-        React.createElement('h1', { style: { fontSize: '24px', fontWeight: '700', margin: '8px 0 4px' } }, 'User Stories'),
-        React.createElement('p', { style: { color: '#6b7280', fontSize: '14px', margin: 0 } }, 'Submit user stories to generate test scenarios and export CSV')
-      ),
-      React.createElement('button', {
-        style: { backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 18px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
-        onClick: function() { navigate('/projects/' + projectId + '/stories/new'); }
-      }, '+ New Story')
-    ),
-    stories.length === 0
-      ? React.createElement('div', { style: { textAlign: 'center', padding: '60px 20px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px dashed #d1d5db' } },
-          React.createElement('p', { style: { fontSize: '18px', marginBottom: '8px' } }, 'No stories yet'),
-          React.createElement('p', { style: { color: '#6b7280' } }, 'Create your first user story to start generating test scenarios.'),
-          React.createElement('button', {
-            style: { backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 18px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginTop: '16px' },
-            onClick: function() { navigate('/projects/' + projectId + '/stories/new'); }
-          }, '+ Create First Story')
-        )
-      : React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
-          stories.map(function(story) {
-            return React.createElement('div', {
-              key: story.id,
-              style: { backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', cursor: 'pointer' },
-              onClick: function() { navigate('/projects/' + projectId + '/stories/' + story.id); }
-            },
-              React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } },
-                React.createElement('h3', { style: { fontSize: '16px', fontWeight: '600', margin: 0 } }, story.title),
-                React.createElement('span', { style: { color: '#fff', fontSize: '11px', padding: '2px 8px', borderRadius: '9999px', fontWeight: '600', backgroundColor: statusColors[story.status] || '#6b7280' } }, story.status)
-              ),
-              React.createElement('p', { style: { color: '#4b5563', fontSize: '14px', margin: '0 0 12px', lineHeight: '1.5' } },
-                (story.description || '').substring(0, 150) + (story.description && story.description.length > 150 ? '...' : '')
-              ),
-              React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-                React.createElement('span', { style: { color: '#9ca3af', fontSize: '12px' } },
-                  (story.scenario_count || 0) + ' scenarios' + (story.approved_count > 0 ? ' \u00B7 ' + story.approved_count + ' approved' : '')
-                ),
-                React.createElement('div', { style: { display: 'flex', gap: '8px' } },
-                  React.createElement('span', { style: { color: '#9ca3af', fontSize: '12px' } }, new Date(story.created_at).toLocaleDateString()),
-                  React.createElement('button', {
-                    style: { background: 'none', border: 'none', color: '#9ca3af', fontSize: '18px', cursor: 'pointer', padding: '0 4px', lineHeight: '1' },
-                    onClick: function(e) { e.stopPropagation(); handleDelete(story.id); }
-                  }, '\u00D7')
-                )
-              )
-            );
-          })
-        )
+      {error && <div role="alert" className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg border border-red-200 mb-6">{error}</div>}
+
+      {loading && <div className="space-y-2">{[1,2].map((i) => <div key={i} className="card p-5"><div className="skeleton h-4 w-1/3 mb-2" /><div className="skeleton h-3 w-3/5" /></div>)}</div>}
+
+      {!loading && stories.length === 0 && (
+        <div className="empty">
+          <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4"><BookOpen size={24} /></div>
+          <h3 className="text-lg font-semibold text-surface-800 mb-1">No stories yet</h3>
+          <p className="text-surface-500 text-sm mb-6 max-w-xs">Create your first user story to start generating test scenarios.</p>
+          <button onClick={() => navigate('/projects/' + projectId + '/stories/new')} className="btn-primary"><Plus size={16} /> Create first story</button>
+        </div>
+      )}
+
+      {!loading && stories.length > 0 && (
+        <div className="space-y-2">
+          {stories.map((story) => (
+            <div key={story.id} onClick={() => navigate('/projects/' + projectId + '/stories/' + story.id)}
+              className="card card-hover p-5 cursor-pointer">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <h3 className="font-semibold text-surface-900">{story.title}</h3>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={STATUS_STYLES[story.status] || 'badge-muted'}>{story.status}</span>
+                  <button onClick={(e) => handleDelete(e, story.id)} className="icon-btn hover:text-red-500" aria-label="Delete"><X size={14} /></button>
+                </div>
+              </div>
+              {story.description && (
+                <p className="text-sm text-surface-600 mb-3 leading-relaxed">
+                  {story.description.length > 150 ? story.description.substring(0, 150) + '...' : story.description}
+                </p>
+              )}
+              <div className="flex items-center justify-between text-xs text-surface-400">
+                <span>{(story.scenario_count || 0)} scenarios{story.approved_count > 0 ? ' · ' + story.approved_count + ' approved' : ''}</span>
+                <span>{new Date(story.created_at).toLocaleDateString()}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

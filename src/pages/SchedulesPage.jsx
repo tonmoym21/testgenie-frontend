@@ -86,17 +86,17 @@ function ScheduleModal({ schedule, collections, environments, onSave, onCancel }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-5 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{schedule ? 'Edit Schedule' : 'New Schedule'}</h2>
-          <button onClick={onCancel} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+    <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onClick={onCancel}>
+      <div className="card w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col shadow-soft-lg animate-slide-up" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5 border-b border-surface-200 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-surface-900">{schedule ? 'Edit schedule' : 'New schedule'}</h2>
+          <button onClick={onCancel} className="icon-btn" aria-label="Close"><X size={16} /></button>
         </div>
 
         <div className="flex-1 overflow-auto p-5 space-y-4">
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Schedule Name</label>
+            <label className="label">Schedule name</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -108,29 +108,25 @@ function ScheduleModal({ schedule, collections, environments, onSave, onCancel }
 
           {/* Schedule Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">What to Run</label>
-            <div className="flex gap-2">
+            <label className="label">What to run</label>
+            <div className="inline-flex p-1 rounded-lg bg-surface-100 w-full">
               <button
                 type="button"
                 onClick={() => setScheduleType('collection')}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  scheduleType === 'collection' 
-                    ? 'bg-brand-600 text-white' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  scheduleType === 'collection' ? 'bg-white text-surface-900 shadow-soft' : 'text-surface-500 hover:text-surface-800'
                 }`}
               >
-                <Folder size={16} className="inline mr-1" /> Collection
+                <Folder size={15} /> Collection
               </button>
               <button
                 type="button"
                 onClick={() => setScheduleType('folder')}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  scheduleType === 'folder' 
-                    ? 'bg-brand-600 text-white' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  scheduleType === 'folder' ? 'bg-white text-surface-900 shadow-soft' : 'text-surface-500 hover:text-surface-800'
                 }`}
               >
-                <Folder size={16} className="inline mr-1" /> Folder
+                <Folder size={15} /> Folder
               </button>
             </div>
           </div>
@@ -138,7 +134,7 @@ function ScheduleModal({ schedule, collections, environments, onSave, onCancel }
           {/* Collection Select */}
           {scheduleType !== 'single' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Collection</label>
+              <label className="label">Collection</label>
               <select
                 value={collectionId}
                 onChange={(e) => { setCollectionId(e.target.value); setFolderId(''); }}
@@ -155,7 +151,7 @@ function ScheduleModal({ schedule, collections, environments, onSave, onCancel }
           {/* Folder Select (if folder type) */}
           {scheduleType === 'folder' && collectionId && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Folder</label>
+              <label className="label">Folder</label>
               <select
                 value={folderId}
                 onChange={(e) => setFolderId(e.target.value)}
@@ -174,7 +170,7 @@ function ScheduleModal({ schedule, collections, environments, onSave, onCancel }
 
           {/* Environment */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Environment (Optional)</label>
+            <label className="label">Environment <span className="text-surface-400 font-normal">(optional)</span></label>
             <select
               value={environmentId}
               onChange={(e) => setEnvironmentId(e.target.value)}
@@ -191,7 +187,7 @@ function ScheduleModal({ schedule, collections, environments, onSave, onCancel }
 
           {/* Cron Schedule */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Schedule</label>
+            <label className="label">Schedule</label>
             <select
               value={cronPreset}
               onChange={(e) => handlePresetChange(e.target.value)}
@@ -209,21 +205,21 @@ function ScheduleModal({ schedule, collections, environments, onSave, onCancel }
                 placeholder="* * * * *"
               />
             )}
-            <p className="text-xs text-gray-400 mt-1">
-              {cronExpression && `Cron: ${cronExpression}`}
+            <p className="text-xs text-surface-400 mt-2">
+              {cronExpression && <>Cron: <code className="kbd">{cronExpression}</code></>}
             </p>
           </div>
 
           {/* Notifications */}
-          <div className="border-t pt-4">
+          <div className="border-t border-surface-200 pt-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={notifyOnFailure}
                 onChange={(e) => setNotifyOnFailure(e.target.checked)}
-                className="rounded border-gray-300 text-brand-600"
+                className="rounded border-surface-300 text-brand-600"
               />
-              <span className="text-sm font-medium text-gray-700">Notify on failure</span>
+              <span className="text-sm font-medium text-surface-700">Notify on failure</span>
             </label>
             {notifyOnFailure && (
               <input
@@ -237,11 +233,11 @@ function ScheduleModal({ schedule, collections, environments, onSave, onCancel }
           </div>
         </div>
 
-        <div className="p-4 border-t border-gray-200 flex gap-3 justify-end">
+        <div className="p-4 border-t border-surface-200 flex gap-3 justify-end">
           <button onClick={onCancel} className="btn-secondary">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="btn-primary">
             {saving && <Loader2 size={16} className="animate-spin" />}
-            {schedule ? 'Save Changes' : 'Create Schedule'}
+            {schedule ? 'Save changes' : 'Create schedule'}
           </button>
         </div>
       </div>
@@ -309,26 +305,31 @@ export default function SchedulesPage() {
     load();
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-32">
-        <Loader2 size={24} className="animate-spin text-brand-600" />
-      </div>
-    );
-  }
-
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="page">
+      <div className="page-header">
         <div>
-          <h1 className="text-2xl font-semibold">Schedules</h1>
-          <p className="text-gray-500 text-sm mt-1">Automate your test runs with cron schedules</p>
+          <h1 className="page-title">Schedules</h1>
+          <p className="page-subtitle">Automate test runs with cron-based schedules.</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={load} className="btn-secondary"><RefreshCw size={16} /> Refresh</button>
-          <button onClick={() => setShowModal(true)} className="btn-primary"><Plus size={16} /> New Schedule</button>
+        <div className="flex items-center gap-2">
+          <button onClick={load} className="btn-secondary btn-sm" disabled={loading}>
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
+          </button>
+          <button onClick={() => setShowModal(true)} className="btn-primary btn-sm"><Plus size={14} /> New schedule</button>
         </div>
       </div>
+
+      {loading && (
+        <div className="space-y-2">
+          {[1,2,3].map((i) => (
+            <div key={i} className="card p-4 flex items-center gap-4">
+              <div className="skeleton w-10 h-10 rounded-lg" />
+              <div className="flex-1 space-y-2"><div className="skeleton h-4 w-2/5" /><div className="skeleton h-3 w-3/5" /></div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {showModal && (
         <ScheduleModal
@@ -349,34 +350,37 @@ export default function SchedulesPage() {
         />
       )}
 
-      {schedules.length === 0 ? (
-        <div className="text-center py-20">
-          <Calendar size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-600 mb-1">No schedules yet</h3>
-          <p className="text-gray-400 text-sm mb-6">Create a schedule to automatically run your tests</p>
-          <button onClick={() => setShowModal(true)} className="btn-primary"><Plus size={16} /> Create Schedule</button>
+      {!loading && schedules.length === 0 ? (
+        <div className="empty">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
+            <Calendar size={24} />
+          </div>
+          <h3 className="text-lg font-semibold text-surface-800 mb-1">No schedules yet</h3>
+          <p className="text-surface-500 text-sm mb-6 max-w-xs">Run your collections or folders on autopilot with a cron schedule.</p>
+          <button onClick={() => setShowModal(true)} className="btn-primary"><Plus size={16} /> Create schedule</button>
         </div>
-      ) : (
-        <div className="space-y-3">
+      ) : !loading && (
+        <div className="card divide-y divide-surface-100 overflow-hidden">
           {schedules.map((schedule) => (
-            <div key={schedule.id} className="card p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <div key={schedule.id} className="p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-4 min-w-0">
                   <button
                     onClick={() => handleToggle(schedule.id)}
-                    className={`p-2 rounded-lg transition-colors ${
-                      schedule.isActive 
-                        ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0 ${
+                      schedule.isActive
+                        ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 ring-1 ring-emerald-600/15'
+                        : 'bg-surface-100 text-surface-400 hover:bg-surface-200'
                     }`}
                     title={schedule.isActive ? 'Pause schedule' : 'Activate schedule'}
+                    aria-label={schedule.isActive ? 'Pause' : 'Activate'}
                   >
-                    {schedule.isActive ? <Play size={18} /> : <Pause size={18} />}
+                    {schedule.isActive ? <Play size={16} /> : <Pause size={16} />}
                   </button>
-                  <div>
-                    <h3 className="font-semibold text-gray-700">{schedule.name}</h3>
-                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-gray-500">
-                      <span className="flex items-center gap-1">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-surface-900 truncate">{schedule.name}</h3>
+                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-surface-500">
+                      <span className="inline-flex items-center gap-1 font-mono">
                         <Clock size={12} />
                         {schedule.cronExpression}
                       </span>
@@ -402,24 +406,18 @@ export default function SchedulesPage() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 shrink-0">
                   {schedule.lastStatus && (
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      schedule.lastStatus === 'passed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {schedule.lastStatus === 'passed' ? <CheckCircle size={12} className="inline mr-1" /> : <XCircle size={12} className="inline mr-1" />}
+                    <span className={schedule.lastStatus === 'passed' ? 'badge-success' : 'badge-danger'}>
+                      {schedule.lastStatus === 'passed' ? <CheckCircle size={10} /> : <XCircle size={10} />}
                       {schedule.runCount} runs
                     </span>
                   )}
-                  <button onClick={() => handleRunNow(schedule.id)} className="btn-ghost text-xs">
-                    <Play size={14} /> Run Now
+                  <button onClick={() => handleRunNow(schedule.id)} className="btn-ghost btn-xs ml-2">
+                    <Play size={12} /> Run now
                   </button>
-                  <button onClick={() => setEditingSchedule(schedule)} className="p-1.5 text-gray-400 hover:text-gray-600">
-                    <Edit2 size={14} />
-                  </button>
-                  <button onClick={() => handleDelete(schedule.id)} className="p-1.5 text-gray-400 hover:text-red-500">
-                    <Trash2 size={14} />
-                  </button>
+                  <button onClick={() => setEditingSchedule(schedule)} className="icon-btn" aria-label="Edit"><Edit2 size={14} /></button>
+                  <button onClick={() => handleDelete(schedule.id)} className="icon-btn hover:text-red-500" aria-label="Delete"><Trash2 size={14} /></button>
                 </div>
               </div>
             </div>

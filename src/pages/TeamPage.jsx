@@ -260,9 +260,9 @@ export default function TeamPage() {
     return (
       <div className="p-8">
         <div className="max-w-xl mx-auto text-center py-16">
-          <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">No Organization</h2>
-          <p className="text-gray-600">
+          <Building2 className="w-16 h-16 text-surface-300 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-surface-900 mb-2">No Organization</h2>
+          <p className="text-surface-600">
             You're not part of any organization yet. Contact your team admin for an invite, or create a new account with your company email.
           </p>
         </div>
@@ -275,14 +275,14 @@ export default function TeamPage() {
     return (
       <div className="p-8">
         <div className="max-w-xl mx-auto text-center py-16">
-          <Shield className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Restricted</h2>
-          <p className="text-gray-600 mb-4">
+          <Shield className="w-16 h-16 text-surface-300 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-surface-900 mb-2">Access Restricted</h2>
+          <p className="text-surface-600 mb-4">
             You don't have permission to manage team settings. Contact your organization admin.
           </p>
-          <div className="bg-gray-50 rounded-lg p-4 inline-block">
-            <p className="text-sm text-gray-600">Your organization: <span className="font-medium">{organization.name}</span></p>
-            <p className="text-sm text-gray-600">Your role: <span className="font-medium capitalize">{organization.userRole}</span></p>
+          <div className="bg-surface-50 rounded-lg p-4 inline-block">
+            <p className="text-sm text-surface-600">Your organization: <span className="font-medium">{organization.name}</span></p>
+            <p className="text-sm text-surface-600">Your role: <span className="font-medium capitalize">{organization.userRole}</span></p>
           </div>
         </div>
       </div>
@@ -294,9 +294,9 @@ export default function TeamPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Team Management</h1>
+          <h1 className="text-2xl font-bold text-surface-900">Team Management</h1>
           {organization && (
-            <p className="text-gray-500 mt-1">
+            <p className="text-surface-500 mt-1">
               {organization.name} • {organization.domain}
             </p>
           )}
@@ -305,7 +305,7 @@ export default function TeamPage() {
           <button
             onClick={loadData}
             disabled={loading}
-            className="px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-2"
+            className="px-4 py-2 text-surface-600 hover:text-surface-900 hover:bg-surface-100 rounded-lg transition-colors flex items-center gap-2"
           >
             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
             Refresh
@@ -329,7 +329,7 @@ export default function TeamPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className="flex gap-1 mb-6 border-b border-surface-200">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -341,12 +341,12 @@ export default function TeamPage() {
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 isActive
                   ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300'
               }`}
             >
               <Icon size={18} />
               {tab.label}
-              <span className={`px-2 py-0.5 rounded-full text-xs ${isActive ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-600'}`}>
+              <span className={`px-2 py-0.5 rounded-full text-xs ${isActive ? 'bg-brand-100 text-brand-700' : 'bg-surface-100 text-surface-600'}`}>
                 {count}
               </span>
             </button>
@@ -367,19 +367,19 @@ export default function TeamPage() {
           {/* Filters */}
           <div className="flex gap-4 mb-6">
             <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" size={18} />
               <input
                 type="text"
                 placeholder="Search by email or name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                className="w-full pl-10 pr-4 py-2 border border-surface-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
               />
             </div>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+              className="px-4 py-2 border border-surface-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
             >
               <option value="">All Roles</option>
               <option value="owner">Owner</option>
@@ -390,7 +390,7 @@ export default function TeamPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+              className="px-4 py-2 border border-surface-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
             >
               <option value="active">Active</option>
               <option value="deactivated">Deactivated</option>
@@ -399,18 +399,18 @@ export default function TeamPage() {
           </div>
 
           {/* Members List */}
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-white border border-surface-200 rounded-lg overflow-hidden">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-surface-50 border-b border-surface-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Member</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Joined</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-surface-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-surface-200">
                 {members.map((member) => (
                   <MemberRow
                     key={member.id}
@@ -426,7 +426,7 @@ export default function TeamPage() {
                 ))}
                 {members.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={5} className="px-6 py-8 text-center text-surface-500">
                       No members found
                     </td>
                   </tr>
@@ -439,34 +439,34 @@ export default function TeamPage() {
 
       {/* Invites Tab */}
       {!loading && activeTab === 'invites' && (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-white border border-surface-200 rounded-lg overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-surface-50 border-b border-surface-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invited By</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expires</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Invited By</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Expires</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-surface-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-surface-200">
               {invites.map((invite) => (
                 <tr key={invite.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">{invite.email}</span>
+                    <span className="text-sm text-surface-900">{invite.email}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      invite.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
+                      invite.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-surface-100 text-surface-700'
                     }`}>
                       {invite.role}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-surface-500">
                     {invite.invitedByEmail}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-surface-500">
                     {invite.isExpired ? (
                       <span className="text-red-600">Expired</span>
                     ) : (
@@ -493,7 +493,7 @@ export default function TeamPage() {
               ))}
               {invites.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-8 text-center text-surface-500">
                     No pending invites
                   </td>
                 </tr>
@@ -507,11 +507,11 @@ export default function TeamPage() {
       {!loading && activeTab === 'domains' && (
         <div>
           {/* Domain Restriction Toggle */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+          <div className="bg-white border border-surface-200 rounded-lg p-6 mb-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-medium text-gray-900">Domain Restriction</h3>
-                <p className="text-sm text-gray-500 mt-1">
+                <h3 className="text-sm font-medium text-surface-900">Domain Restriction</h3>
+                <p className="text-sm text-surface-500 mt-1">
                   When enabled, only users with approved email domains can be invited or join.
                 </p>
               </div>
@@ -519,7 +519,7 @@ export default function TeamPage() {
                 onClick={handleToggleDomainRestriction}
                 disabled={actionLoading}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  organization?.domainRestrictionEnabled ? 'bg-brand-600' : 'bg-gray-200'
+                  organization?.domainRestrictionEnabled ? 'bg-brand-600' : 'bg-surface-200'
                 } disabled:opacity-50`}
               >
                 <span
@@ -544,7 +544,7 @@ export default function TeamPage() {
               placeholder="example.com"
               value={newDomain}
               onChange={(e) => setNewDomain(e.target.value)}
-              className="flex-1 max-w-sm px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+              className="flex-1 max-w-sm px-4 py-2 border border-surface-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
             />
             <button
               type="submit"
@@ -557,27 +557,27 @@ export default function TeamPage() {
           </form>
 
           {/* Domains List */}
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-white border border-surface-200 rounded-lg overflow-hidden">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-surface-50 border-b border-surface-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domain</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added By</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Domain</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Added By</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Added</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-surface-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-surface-200">
                 {/* Primary domain (from organization) */}
                 {organization?.domain && (
-                  <tr className="bg-gray-50">
+                  <tr className="bg-surface-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-medium">{organization.domain}</span>
+                      <span className="text-sm text-surface-900 font-medium">{organization.domain}</span>
                       <span className="ml-2 text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">Primary</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">—</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">—</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-400">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-surface-500">—</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-surface-500">—</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-surface-400">
                       Cannot remove
                     </td>
                   </tr>
@@ -585,12 +585,12 @@ export default function TeamPage() {
                 {domains.map((domain) => (
                   <tr key={domain.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">{domain.domain}</span>
+                      <span className="text-sm text-surface-900">{domain.domain}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-surface-500">
                       {domain.created_by_email || '—'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-surface-500">
                       {new Date(domain.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -606,7 +606,7 @@ export default function TeamPage() {
                 ))}
                 {domains.length === 0 && !organization?.domain && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={4} className="px-6 py-8 text-center text-surface-500">
                       No allowed domains configured
                     </td>
                   </tr>

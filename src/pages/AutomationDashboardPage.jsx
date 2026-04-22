@@ -21,9 +21,9 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'brand' }
     <div className="card p-5">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-gray-500">{title}</p>
+          <p className="text-sm text-surface-500">{title}</p>
           <p className="text-2xl font-bold mt-1">{value}</p>
-          {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
+          {subtitle && <p className="text-xs text-surface-400 mt-1">{subtitle}</p>}
         </div>
         <div className={`p-2.5 rounded-xl ${colorClasses[color]}`}>
           <Icon size={20} />
@@ -42,7 +42,7 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'brand' }
 function RecentRunsTable({ runs }) {
   if (!runs || runs.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-400">
+      <div className="text-center py-8 text-surface-400">
         <Monitor size={32} className="mx-auto mb-2 opacity-50" />
         <p className="text-sm">No automation runs yet</p>
       </div>
@@ -53,19 +53,19 @@ function RecentRunsTable({ runs }) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-100">
-            <th className="text-left py-3 px-4 text-gray-500 font-medium">Test</th>
-            <th className="text-left py-3 px-4 text-gray-500 font-medium">Status</th>
-            <th className="text-left py-3 px-4 text-gray-500 font-medium">Duration</th>
-            <th className="text-left py-3 px-4 text-gray-500 font-medium">Screenshots</th>
-            <th className="text-left py-3 px-4 text-gray-500 font-medium">Time</th>
+          <tr className="border-b border-surface-100">
+            <th className="text-left py-3 px-4 text-surface-500 font-medium">Test</th>
+            <th className="text-left py-3 px-4 text-surface-500 font-medium">Status</th>
+            <th className="text-left py-3 px-4 text-surface-500 font-medium">Duration</th>
+            <th className="text-left py-3 px-4 text-surface-500 font-medium">Screenshots</th>
+            <th className="text-left py-3 px-4 text-surface-500 font-medium">Time</th>
           </tr>
         </thead>
         <tbody>
           {runs.map((run) => (
-            <tr key={run.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+            <tr key={run.id} className="border-b border-gray-50 hover:bg-surface-50/50">
               <td className="py-3 px-4">
-                <Link to={`/executions/${run.id}`} className="font-medium text-gray-700 hover:text-brand-600">
+                <Link to={`/executions/${run.id}`} className="font-medium text-surface-700 hover:text-brand-600">
                   {run.testName}
                 </Link>
               </td>
@@ -77,18 +77,18 @@ function RecentRunsTable({ runs }) {
                   {run.status}
                 </span>
               </td>
-              <td className="py-3 px-4 text-gray-500">{(run.durationMs / 1000).toFixed(1)}s</td>
+              <td className="py-3 px-4 text-surface-500">{(run.durationMs / 1000).toFixed(1)}s</td>
               <td className="py-3 px-4">
                 {run.screenshots && run.screenshots.length > 0 ? (
-                  <span className="flex items-center gap-1 text-gray-500">
+                  <span className="flex items-center gap-1 text-surface-500">
                     <Camera size={14} />
                     {run.screenshots.length}
                   </span>
                 ) : (
-                  <span className="text-gray-300">-</span>
+                  <span className="text-surface-300">-</span>
                 )}
               </td>
-              <td className="py-3 px-4 text-gray-400 text-xs">
+              <td className="py-3 px-4 text-surface-400 text-xs">
                 {run.completedAt ? new Date(run.completedAt).toLocaleString() : '-'}
               </td>
             </tr>
@@ -102,7 +102,7 @@ function RecentRunsTable({ runs }) {
 function FlakyTestsCard({ tests }) {
   if (!tests || tests.length === 0) {
     return (
-      <div className="text-center py-6 text-gray-400">
+      <div className="text-center py-6 text-surface-400">
         <CheckCircle size={24} className="mx-auto mb-2 opacity-50" />
         <p className="text-sm">No flaky tests detected</p>
       </div>
@@ -116,10 +116,10 @@ function FlakyTestsCard({ tests }) {
         return (
           <div key={i} className="p-3 bg-yellow-50/50 rounded-lg">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700 truncate flex-1">{t.testName}</span>
+              <span className="text-sm font-medium text-surface-700 truncate flex-1">{t.testName}</span>
               <span className="text-xs font-bold text-yellow-600 ml-2">{flakyRate}% flaky</span>
             </div>
-            <div className="flex gap-2 text-xs text-gray-500">
+            <div className="flex gap-2 text-xs text-surface-500">
               <span className="text-green-600">{t.passed} passed</span>
               <span className="text-red-600">{t.failed} failed</span>
               <span>of {t.total} runs</span>
@@ -134,7 +134,7 @@ function FlakyTestsCard({ tests }) {
 function AssetReadinessChart({ data }) {
   if (!data || Object.keys(data).length === 0) {
     return (
-      <div className="text-center py-6 text-gray-400">
+      <div className="text-center py-6 text-surface-400">
         <p className="text-sm">No automation assets</p>
       </div>
     );
@@ -220,7 +220,7 @@ export default function AutomationDashboardPage() {
   const { summary, dailyTrend, recentRuns, flakyTests, assetsByReadiness } = metrics || {};
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="page max-w-none">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -228,7 +228,7 @@ export default function AutomationDashboardPage() {
             <Monitor className="text-brand-600" />
             Automation Dashboard
           </h1>
-          <p className="text-gray-500 text-sm mt-1">Monitor your UI automation test executions</p>
+          <p className="text-surface-500 text-sm mt-1">Monitor your UI automation test executions</p>
         </div>
         <div className="flex gap-3">
           <button 
@@ -301,11 +301,11 @@ export default function AutomationDashboardPage() {
               })}
             </div>
           ) : (
-            <div className="h-48 flex items-center justify-center text-gray-400">
+            <div className="h-48 flex items-center justify-center text-surface-400">
               <p className="text-sm">No data available</p>
             </div>
           )}
-          <div className="flex items-center gap-4 mt-4 text-xs text-gray-500">
+          <div className="flex items-center gap-4 mt-4 text-xs text-surface-500">
             <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-400" /> Passed</span>
             <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-red-400" /> Failed</span>
           </div>
@@ -325,7 +325,7 @@ export default function AutomationDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Runs */}
         <div className="card lg:col-span-2">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
             <h3 className="font-semibold">Recent Automation Runs</h3>
             <Link to="/executions" className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-1">
               View all <ArrowRight size={14} />
