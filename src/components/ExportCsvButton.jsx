@@ -131,7 +131,7 @@ export function ExportCsvButton({ projectId, selectedTestCaseIds = null, disable
         className={
           'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ' +
           (disabled || isLoading
-            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            ? 'bg-surface-200 text-surface-400 cursor-not-allowed'
             : 'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800')
         }
         aria-label={buttonLabel}

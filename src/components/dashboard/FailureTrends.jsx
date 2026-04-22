@@ -6,7 +6,7 @@
 export default function FailureTrends({ dailyTrend }) {
   if (!dailyTrend || dailyTrend.length === 0) {
     return (
-      <div className="h-48 flex items-center justify-center text-gray-400">
+      <div className="h-48 flex items-center justify-center text-surface-400">
         <p className="text-sm">No trend data available yet. Run some tests to see trends!</p>
       </div>
     );
@@ -32,7 +32,7 @@ export default function FailureTrends({ dailyTrend }) {
           >
             {/* Tooltip */}
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-              <div className="bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
+              <div className="bg-surface-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
                 <div className="font-medium">{date}</div>
                 <div className="text-green-300">{passed} passed</div>
                 <div className="text-red-300">{failed} failed</div>

@@ -50,7 +50,7 @@ export default function HealthMetrics({ metrics = {} }) {
         const isPositive = invertDelta ? delta < 0 : delta > 0;
 
         return (
-          <div key={key} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-sm transition-shadow">
+          <div key={key} className="bg-white rounded-xl border border-surface-200 p-5 hover:shadow-sm transition-shadow">
             <div className="flex items-center justify-between mb-3">
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color(value)}`}>
                 <Icon size={18} />
@@ -63,7 +63,7 @@ export default function HealthMetrics({ metrics = {} }) {
               )}
             </div>
             <div className="text-2xl font-semibold tracking-tight">{format(value)}</div>
-            <div className="text-xs text-gray-400 mt-0.5">{label}</div>
+            <div className="text-xs text-surface-400 mt-0.5">{label}</div>
           </div>
         );
       })}

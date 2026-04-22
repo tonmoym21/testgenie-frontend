@@ -27,7 +27,7 @@ export default function PreflightChecklist({ projectId, assetId, onReady, onFail
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-5 space-y-4">
+    <div className="bg-surface-800 rounded-lg p-5 space-y-4">
       <div className="flex items-center justify-between">
         <h4 className="text-white font-medium">Execution Preflight</h4>
         <button onClick={runPreflight} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3 py-1.5 rounded text-sm">
@@ -44,9 +44,9 @@ export default function PreflightChecklist({ projectId, assetId, onReady, onFail
           {result.checks?.length > 0 && (
             <div className="space-y-1">
               {result.checks.map((c, i) => (
-                <div key={i} className="flex items-start gap-2 text-sm text-gray-300">
+                <div key={i} className="flex items-start gap-2 text-sm text-surface-300">
                   {statusIcon(c.status)}
-                  <span className="text-gray-400 w-40 shrink-0">{c.name.replace(/_/g, ' ')}</span>
+                  <span className="text-surface-400 w-40 shrink-0">{c.name.replace(/_/g, ' ')}</span>
                   <span>{c.detail}</span>
                 </div>
               ))}
@@ -71,7 +71,7 @@ export default function PreflightChecklist({ projectId, assetId, onReady, onFail
       )}
 
       {!result && (
-        <p className="text-sm text-gray-500">Run preflight to verify target URL, auth, selectors, and test file readiness before execution.</p>
+        <p className="text-sm text-surface-500">Run preflight to verify target URL, auth, selectors, and test file readiness before execution.</p>
       )}
     </div>
   );

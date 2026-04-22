@@ -114,7 +114,7 @@ function ResponseViewer({ result, onClose }) {
         )}
         {activeTab === 'logs' && (
           logs.length > 0 ? (
-            <div className="bg-gray-900 rounded-lg p-3 font-mono text-xs space-y-1 max-h-60 overflow-auto">
+            <div className="bg-surface-900 rounded-lg p-3 font-mono text-xs space-y-1 max-h-60 overflow-auto">
               {logs.map((log, i) => (<div key={i} className={`${log.level === 'error' ? 'text-red-400' : log.level === 'warn' ? 'text-yellow-400' : 'text-surface-300'}`}><span className="text-surface-500">[{new Date(log.timestamp).toLocaleTimeString()}]</span> {log.message}</div>))}
             </div>
           ) : <p className="text-sm text-surface-400 text-center py-8">No logs captured</p>

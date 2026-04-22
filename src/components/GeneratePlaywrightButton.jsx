@@ -133,8 +133,8 @@ export default function GeneratePlaywrightButton({ projectId, storyIngestionId, 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">Generate Playwright Tests</h3>
-            <p className="text-sm text-gray-500 mb-4">Select category tags for the generated test suite.</p>
+            <h3 className="text-lg font-semibold text-surface-900 mb-1">Generate Playwright Tests</h3>
+            <p className="text-sm text-surface-500 mb-4">Select category tags for the generated test suite.</p>
 
             <div className="flex flex-wrap gap-2 mb-5">
               {CATEGORY_OPTIONS.map((cat) => {
@@ -144,7 +144,7 @@ export default function GeneratePlaywrightButton({ projectId, storyIngestionId, 
                     key={cat.value}
                     onClick={() => toggle(cat.value)}
                     className={`rounded-full border px-3 py-1 text-xs font-medium transition-all ${
-                      active ? cat.color + ' ring-2 ring-offset-1 ring-current' : 'bg-gray-50 text-gray-400 border-gray-200'
+                      active ? cat.color + ' ring-2 ring-offset-1 ring-current' : 'bg-surface-50 text-surface-400 border-surface-200'
                     }`}
                   >{cat.label}</button>
                 );
@@ -194,7 +194,7 @@ export default function GeneratePlaywrightButton({ projectId, storyIngestionId, 
 
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowModal(false)}
-                className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                className="rounded-lg px-4 py-2 text-sm text-surface-600 hover:bg-surface-100"
               >{result ? 'Close' : 'Cancel'}</button>
               {!result && (
                 <button onClick={handleGenerate} disabled={loading}

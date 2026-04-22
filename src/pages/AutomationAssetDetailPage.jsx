@@ -604,7 +604,7 @@ export default function AutomationAssetDetailPage() {
                   {run.output_logs && (
                     <div>
                       <h4 className="text-xs font-medium text-surface-500 mb-1">Output Logs</h4>
-                      <pre className="text-[11px] font-mono bg-gray-900 text-surface-100 rounded-lg p-3 max-h-64 overflow-auto whitespace-pre-wrap">{run.output_logs}</pre>
+                      <pre className="text-[11px] font-mono bg-surface-900 text-surface-100 rounded-lg p-3 max-h-64 overflow-auto whitespace-pre-wrap">{run.output_logs}</pre>
                     </div>
                   )}
                 </div>

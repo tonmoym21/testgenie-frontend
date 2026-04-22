@@ -73,9 +73,9 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Invite Team Members</h2>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
+          <h2 className="text-lg font-semibold text-surface-900">Invite Team Members</h2>
+          <button onClick={onClose} className="p-1 text-surface-400 hover:text-surface-600 rounded-lg hover:bg-surface-100">
             <X size={20} />
           </button>
         </div>
@@ -84,7 +84,7 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
         <div className="flex-1 overflow-y-auto p-6">
           {!results ? (
             <form onSubmit={handleSubmit}>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-surface-600 mb-4">
                 Enter email addresses to invite. They'll receive an invitation link valid for 7 days.
               </p>
 
@@ -97,13 +97,13 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
                         placeholder="colleague@company.com"
                         value={invite.email}
                         onChange={(e) => handleChange(index, 'email', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        className="w-full px-3 py-2 border border-surface-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                       />
                     </div>
                     <select
                       value={invite.role}
                       onChange={(e) => handleChange(index, 'role', e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      className="px-3 py-2 border border-surface-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                     >
                       <option value="member">Member</option>
                       <option value="viewer">Viewer</option>
@@ -113,7 +113,7 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
                       type="button"
                       onClick={() => handleRemoveRow(index)}
                       disabled={invites.length <= 1}
-                      className="p-2 text-gray-400 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="p-2 text-surface-400 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Trash2 size={18} />
                     </button>
@@ -136,7 +136,7 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-4 py-2 text-surface-700 hover:bg-surface-100 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
@@ -174,10 +174,10 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
                   {/* Invite Links - Show even if email sent */}
                   <div className="space-y-3">
                     {results.created.map((inv, i) => (
-                      <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                      <div key={i} className="bg-surface-50 rounded-lg p-3 border border-surface-200">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">{inv.email}</span>
+                            <span className="text-sm font-medium text-surface-900">{inv.email}</span>
                             {inv.reused && (
                               <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
                                 Refreshed
@@ -185,7 +185,7 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
                             )}
                           </div>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            inv.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
+                            inv.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-surface-100 text-surface-600'
                           }`}>
                             {inv.role}
                           </span>
@@ -212,12 +212,12 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
                         {/* Invite Link */}
                         {inv.inviteUrl && (
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 bg-white border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-600 font-mono truncate">
+                            <div className="flex-1 bg-white border border-surface-200 rounded px-2 py-1.5 text-xs text-surface-600 font-mono truncate">
                               {window.location.origin}{inv.inviteUrl}
                             </div>
                             <button
                               onClick={() => copyInviteLink(inv.inviteUrl)}
-                              className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              className="p-1.5 text-surface-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                               title="Copy invite link"
                             >
                               {copiedLink === inv.inviteUrl ? (
@@ -232,7 +232,7 @@ export default function InviteModal({ isOwner, onClose, onSuccess }) {
                     ))}
                   </div>
                   
-                  <p className="text-xs text-gray-500 mt-3 flex items-center gap-1">
+                  <p className="text-xs text-surface-500 mt-3 flex items-center gap-1">
                     <Link2 size={12} />
                     Copy and share the invite link(s) with your team members
                   </p>

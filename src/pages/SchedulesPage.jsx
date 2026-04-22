@@ -163,7 +163,7 @@ function ScheduleModal({ schedule, collections, environments, onSave, onCancel }
                 ))}
               </select>
               {folders.length === 0 && (
-                <p className="text-xs text-gray-400 mt-1">This collection has no folders</p>
+                <p className="text-xs text-surface-400 mt-1">This collection has no folders</p>
               )}
             </div>
           )}

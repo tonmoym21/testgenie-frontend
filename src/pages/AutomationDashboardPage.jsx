@@ -63,7 +63,7 @@ function RecentRunsTable({ runs }) {
         </thead>
         <tbody>
           {runs.map((run) => (
-            <tr key={run.id} className="border-b border-gray-50 hover:bg-surface-50/50">
+            <tr key={run.id} className="border-b border-surface-50 hover:bg-surface-50/50">
               <td className="py-3 px-4">
                 <Link to={`/executions/${run.id}`} className="font-medium text-surface-700 hover:text-brand-600">
                   {run.testName}
@@ -145,7 +145,7 @@ function AssetReadinessChart({ data }) {
     ready: 'bg-green-500',
     partial: 'bg-yellow-500',
     not_ready: 'bg-red-500',
-    unknown: 'bg-gray-400',
+    unknown: 'bg-surface-400',
   };
   
   return (

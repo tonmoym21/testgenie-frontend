@@ -35,11 +35,11 @@ function ConnectPanel({ onConnect }) {
         <JiraLogo />
       </div>
       <h2 className="text-xl font-semibold mb-2">Connect Jira</h2>
-      <p className="text-gray-500 text-sm mb-6">
+      <p className="text-surface-500 text-sm mb-6">
         Link your Atlassian Jira account to auto-attach test results to issues and sync run status.
       </p>
-      <div className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 mb-6 text-left space-y-1">
-        <p className="font-medium text-gray-600 mb-2">What you get:</p>
+      <div className="text-xs text-surface-400 bg-surface-50 rounded-lg p-3 mb-6 text-left space-y-1">
+        <p className="font-medium text-surface-600 mb-2">What you get:</p>
         <p>• Link collections or tests to Jira issues</p>
         <p>• Push run results as comments automatically</p>
         <p>• View last run status per ticket</p>
@@ -63,10 +63,10 @@ function LinkRow({ link, onSync, onDelete }) {
 
   const statusColor = link.lastRunStatus === 'completed' ? 'text-green-600 bg-green-50'
     : link.lastRunStatus === 'failed' ? 'text-red-600 bg-red-50'
-    : 'text-gray-500 bg-gray-100';
+    : 'text-surface-500 bg-surface-100';
 
   return (
-    <tr className="border-b border-gray-50 hover:bg-gray-50/50 group">
+    <tr className="border-b border-surface-50 hover:bg-surface-50/50 group">
       <td className="px-4 py-3">
         <a
           href={`https://jira.atlassian.com/browse/${link.issueKey}`}
@@ -76,25 +76,25 @@ function LinkRow({ link, onSync, onDelete }) {
         >
           {link.issueKey} <ExternalLink size={11} />
         </a>
-        {link.issueSummary && <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{link.issueSummary}</p>}
+        {link.issueSummary && <p className="text-xs text-surface-400 mt-0.5 truncate max-w-xs">{link.issueSummary}</p>}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
-        {link.collectionName || <span className="text-gray-300 italic">—</span>}
+      <td className="px-4 py-3 text-sm text-surface-600">
+        {link.collectionName || <span className="text-surface-300 italic">—</span>}
       </td>
       <td className="px-4 py-3">
         {link.lastRunStatus ? (
           <span className={`text-xs font-medium px-2 py-0.5 rounded ${statusColor}`}>{link.lastRunStatus}</span>
-        ) : <span className="text-xs text-gray-300">Never synced</span>}
+        ) : <span className="text-xs text-surface-300">Never synced</span>}
       </td>
-      <td className="px-4 py-3 text-xs text-gray-400">
+      <td className="px-4 py-3 text-xs text-surface-400">
         {link.lastSyncedAt ? new Date(link.lastSyncedAt).toLocaleString() : '—'}
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={handleSync} disabled={syncing} className="p-1.5 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg" title="Sync latest result to Jira">
+          <button onClick={handleSync} disabled={syncing} className="p-1.5 text-surface-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg" title="Sync latest result to Jira">
             {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           </button>
-          <button onClick={() => onDelete(link.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg" title="Remove link">
+          <button onClick={() => onDelete(link.id)} className="p-1.5 text-surface-300 hover:text-red-500 hover:bg-red-50 rounded-lg" title="Remove link">
             <Trash2 size={14} />
           </button>
         </div>
@@ -149,14 +149,14 @@ function AddLinkModal({ onAdd, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
-        <div className="p-5 border-b border-gray-200 flex items-center justify-between">
+        <div className="p-5 border-b border-surface-200 flex items-center justify-between">
           <h2 className="text-lg font-semibold flex items-center gap-2"><Link2 size={18} className="text-blue-600" /> Link Jira Issue</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+          <button onClick={onClose} className="p-1.5 hover:bg-surface-100 rounded-lg"><X size={18} /></button>
         </div>
         <div className="p-5 space-y-4">
           {/* Search issues */}
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Search Jira Issues</label>
+            <label className="text-xs text-surface-500 mb-1 block">Search Jira Issues</label>
             <div className="flex gap-2">
               <input
                 value={searchQuery}
@@ -170,12 +170,12 @@ function AddLinkModal({ onAdd, onClose }) {
               </button>
             </div>
             {searchResults.length > 0 && (
-              <div className="border border-gray-200 rounded-lg mt-1 max-h-40 overflow-auto">
+              <div className="border border-surface-200 rounded-lg mt-1 max-h-40 overflow-auto">
                 {searchResults.map((issue) => (
                   <button key={issue.key} onClick={() => selectIssue(issue)}
-                    className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                    className="w-full text-left px-3 py-2 hover:bg-surface-50 border-b border-surface-100 last:border-0">
                     <span className="font-mono text-xs text-blue-600 font-medium">{issue.key}</span>
-                    <span className="text-sm text-gray-600 ml-2">{issue.summary}</span>
+                    <span className="text-sm text-surface-600 ml-2">{issue.summary}</span>
                   </button>
                 ))}
               </div>
@@ -185,11 +185,11 @@ function AddLinkModal({ onAdd, onClose }) {
           {/* Manual entry */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Issue Key <span className="text-red-500">*</span></label>
+              <label className="text-xs text-surface-500 mb-1 block">Issue Key <span className="text-red-500">*</span></label>
               <input value={issueKey} onChange={(e) => setIssueKey(e.target.value.toUpperCase())} className="input text-sm font-mono" placeholder="PROJ-123" />
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Collection (optional)</label>
+              <label className="text-xs text-surface-500 mb-1 block">Collection (optional)</label>
               <select value={collectionId} onChange={(e) => setCollectionId(e.target.value)} className="input text-sm">
                 <option value="">None</option>
                 {collections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -198,11 +198,11 @@ function AddLinkModal({ onAdd, onClose }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="syncResults" checked={syncResults} onChange={(e) => setSyncResults(e.target.checked)} className="rounded border-gray-300 text-brand-600" />
-            <label htmlFor="syncResults" className="text-sm text-gray-600">Auto-sync run results to Jira as comments</label>
+            <input type="checkbox" id="syncResults" checked={syncResults} onChange={(e) => setSyncResults(e.target.checked)} className="rounded border-surface-300 text-brand-600" />
+            <label htmlFor="syncResults" className="text-sm text-surface-600">Auto-sync run results to Jira as comments</label>
           </div>
         </div>
-        <div className="p-4 border-t border-gray-200 flex gap-3 justify-end">
+        <div className="p-4 border-t border-surface-200 flex gap-3 justify-end">
           <button onClick={onClose} className="btn-secondary">Cancel</button>
           <button onClick={handleAdd} disabled={saving} className="btn-primary">
             {saving && <Loader2 size={14} className="animate-spin" />} Link Issue
@@ -270,7 +270,7 @@ export default function JiraPage() {
         <h1 className="text-2xl font-semibold flex items-center gap-3 mb-2">
           <JiraLogo /> Jira Integration
         </h1>
-        <p className="text-gray-500 text-sm mb-8">Connect Atlassian Jira to link test results with issues.</p>
+        <p className="text-surface-500 text-sm mb-8">Connect Atlassian Jira to link test results with issues.</p>
         <ConnectPanel />
       </div>
     );
@@ -288,7 +288,7 @@ export default function JiraPage() {
             <span className="flex items-center gap-1.5 text-sm text-green-600">
               <CheckCircle size={14} /> Connected
             </span>
-            {status.jiraBaseUrl && <span className="text-xs text-gray-400">— {status.jiraBaseUrl}</span>}
+            {status.jiraBaseUrl && <span className="text-xs text-surface-400">— {status.jiraBaseUrl}</span>}
           </div>
         </div>
         <div className="flex gap-2">
@@ -307,20 +307,20 @@ export default function JiraPage() {
       {/* Links table */}
       {links.length === 0 ? (
         <div className="text-center py-20">
-          <Link2 size={48} className="mx-auto text-gray-200 mb-4" />
-          <h3 className="text-lg font-medium text-gray-500 mb-1">No Jira links yet</h3>
-          <p className="text-sm text-gray-400 mb-6">Link a Jira issue to a collection to auto-sync test results</p>
+          <Link2 size={48} className="mx-auto text-surface-200 mb-4" />
+          <h3 className="text-lg font-medium text-surface-500 mb-1">No Jira links yet</h3>
+          <p className="text-sm text-surface-400 mb-6">Link a Jira issue to a collection to auto-sync test results</p>
           <button onClick={() => setShowAddLink(true)} className="btn-primary"><Plus size={16} /> Link Your First Issue</button>
         </div>
       ) : (
         <div className="card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Issue</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Collection</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Last Status</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Last Synced</th>
+              <tr className="border-b border-surface-100 bg-surface-50/50">
+                <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Issue</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Collection</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Last Status</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Last Synced</th>
                 <th className="px-4 py-3 w-24"></th>
               </tr>
             </thead>
@@ -330,8 +330,8 @@ export default function JiraPage() {
               ))}
             </tbody>
           </table>
-          <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/30">
-            <p className="text-xs text-gray-400">{links.length} link{links.length !== 1 ? 's' : ''}</p>
+          <div className="px-4 py-3 border-t border-surface-100 bg-surface-50/30">
+            <p className="text-xs text-surface-400">{links.length} link{links.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
       )}

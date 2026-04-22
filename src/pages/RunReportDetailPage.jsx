@@ -8,10 +8,10 @@ import {
 
 function TestResultRow({ result, isExpanded, onToggle }) {
   return (
-    <div className="border-b border-gray-100 last:border-0">
+    <div className="border-b border-surface-100 last:border-0">
       <div 
-        className={`p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors ${
-          isExpanded ? 'bg-gray-50' : ''
+        className={`p-4 flex items-center justify-between cursor-pointer hover:bg-surface-50 transition-colors ${
+          isExpanded ? 'bg-surface-50' : ''
         }`}
         onClick={onToggle}
       >
@@ -24,7 +24,7 @@ function TestResultRow({ result, isExpanded, onToggle }) {
             <XCircle size={18} className="text-red-500 shrink-0" />
           )}
           <div>
-            <p className="font-medium text-gray-700">{result.name}</p>
+            <p className="font-medium text-surface-700">{result.name}</p>
             {result.error && !isExpanded && (
               <p className="text-xs text-red-500 truncate max-w-md mt-0.5">{result.error}</p>
             )}
@@ -38,12 +38,12 @@ function TestResultRow({ result, isExpanded, onToggle }) {
           }`}>
             {result.status}
           </span>
-          {isExpanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+          {isExpanded ? <ChevronUp size={16} className="text-surface-400" /> : <ChevronDown size={16} className="text-surface-400" />}
         </div>
       </div>
       
       {isExpanded && (
-        <div className="px-4 pb-4 bg-gray-50/50">
+        <div className="px-4 pb-4 bg-surface-50/50">
           {result.error && (
             <div className="mb-3 p-3 bg-red-50 rounded-lg text-sm text-red-700">
               <strong>Error:</strong> {result.error}
@@ -53,7 +53,7 @@ function TestResultRow({ result, isExpanded, onToggle }) {
           {result.rawResponse && (
             <div className="mb-3">
               <p className="text-xs text-surface-500 mb-2">Response</p>
-              <div className="p-3 bg-gray-100 rounded-lg text-xs font-mono overflow-x-auto">
+              <div className="p-3 bg-surface-100 rounded-lg text-xs font-mono overflow-x-auto">
                 <div className="flex gap-4 mb-2">
                   <span className={`px-2 py-0.5 rounded ${
                     result.rawResponse.statusCode < 300 ? 'bg-green-200 text-green-800' :
@@ -64,7 +64,7 @@ function TestResultRow({ result, isExpanded, onToggle }) {
                   <span className="text-surface-500">{result.rawResponse.responseTime}ms</span>
                 </div>
                 {result.rawResponse.body && (
-                  <pre className="max-h-40 overflow-auto text-gray-700">
+                  <pre className="max-h-40 overflow-auto text-surface-700">
                     {typeof result.rawResponse.body === 'object' 
                       ? JSON.stringify(result.rawResponse.body, null, 2) 
                       : result.rawResponse.body}
@@ -87,14 +87,14 @@ function TestResultRow({ result, isExpanded, onToggle }) {
                     ) : (
                       <XCircle size={14} className="text-red-500 mt-0.5" />
                     )}
-                    <span className="text-xs text-gray-700">{a.message}</span>
+                    <span className="text-xs text-surface-700">{a.message}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
           
-          <p className="text-xs text-gray-400 mt-3">
+          <p className="text-xs text-surface-400 mt-3">
             Executed at {result.executedAt ? new Date(result.executedAt).toLocaleString() : 'N/A'}
           </p>
         </div>
@@ -243,8 +243,8 @@ export default function RunReportDetailPage() {
                 <Download size={14} /> Download
               </button>
               <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg hidden group-hover:block z-10">
-                <button onClick={() => handleDownload('json')} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50">JSON</button>
-                <button onClick={() => handleDownload('csv')} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50">CSV</button>
+                <button onClick={() => handleDownload('json')} className="block w-full text-left px-4 py-2 text-sm hover:bg-surface-50">JSON</button>
+                <button onClick={() => handleDownload('csv')} className="block w-full text-left px-4 py-2 text-sm hover:bg-surface-50">CSV</button>
               </div>
             </div>
           </div>
@@ -254,7 +254,7 @@ export default function RunReportDetailPage() {
       {/* Summary Stats */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="card p-4 text-center">
-          <p className="text-3xl font-bold text-gray-700">{report.totalTests}</p>
+          <p className="text-3xl font-bold text-surface-700">{report.totalTests}</p>
           <p className="text-sm text-surface-500">Total Tests</p>
         </div>
         <div className="card p-4 text-center">
@@ -275,11 +275,11 @@ export default function RunReportDetailPage() {
 
       {/* Test Results */}
       <div className="card">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
           <h3 className="font-semibold">Test Results</h3>
           <div className="flex gap-2">
             <button onClick={expandAll} className="text-xs text-brand-600 hover:text-brand-700">Expand All</button>
-            <span className="text-gray-300">|</span>
+            <span className="text-surface-300">|</span>
             <button onClick={collapseAll} className="text-xs text-brand-600 hover:text-brand-700">Collapse All</button>
           </div>
         </div>
@@ -294,7 +294,7 @@ export default function RunReportDetailPage() {
               />
             ))
           ) : (
-            <div className="p-8 text-center text-gray-400">
+            <div className="p-8 text-center text-surface-400">
               <p className="text-sm">No test results available</p>
             </div>
           )}
@@ -326,10 +326,10 @@ export default function RunReportDetailPage() {
           {report.environmentSnapshot && Object.keys(report.environmentSnapshot).length > 0 && (
             <div className="col-span-2">
               <span className="text-surface-500">Environment Variables:</span>
-              <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+              <div className="mt-2 p-3 bg-surface-50 rounded-lg">
                 <div className="flex flex-wrap gap-2">
                   {Object.keys(report.environmentSnapshot).map(key => (
-                    <span key={key} className="text-xs bg-gray-200 px-2 py-1 rounded font-mono">{key}</span>
+                    <span key={key} className="text-xs bg-surface-200 px-2 py-1 rounded font-mono">{key}</span>
                   ))}
                 </div>
               </div>
