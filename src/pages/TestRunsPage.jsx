@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { getCurrentProjectId } from '../utils/currentProject';
 import {
   Plus, Search, Filter, ChevronDown, CheckCircle2, XCircle, Loader2,
   MoreHorizontal, Play, LayoutGrid, List as ListIcon, User, Sparkles,
@@ -152,7 +153,10 @@ export default function TestRunsPage() {
         </div>
         <div className="flex items-center gap-2" ref={createMenuRef}>
           <div className="relative inline-flex">
-            <button className="btn-primary rounded-r-none" onClick={() => navigate('/run-test')}>
+            <button className="btn-primary rounded-r-none" onClick={() => {
+              const pid = getCurrentProjectId();
+              navigate(pid ? `/projects/${pid}/test-runs/new` : '/projects');
+            }}>
               <Plus size={16} /> Create Manual Run
             </button>
             <button
@@ -165,7 +169,11 @@ export default function TestRunsPage() {
             {createMenuOpen && (
               <div className="absolute right-0 top-full mt-1 w-60 bg-white border border-surface-200 rounded-lg shadow-soft-lg z-30 py-1 text-sm">
                 <button
-                  onClick={() => { setCreateMenuOpen(false); navigate('/run-test'); }}
+                  onClick={() => {
+                    setCreateMenuOpen(false);
+                    const pid = getCurrentProjectId();
+                    navigate(pid ? `/projects/${pid}/test-runs/new` : '/projects');
+                  }}
                   className="w-full text-left px-3 py-2 hover:bg-surface-50 flex items-start gap-2"
                 >
                   <Play size={14} className="mt-0.5 text-surface-500" />
@@ -283,7 +291,13 @@ export default function TestRunsPage() {
                   ? 'Kick off a run to populate this list.'
                   : 'Once a run finishes, it will show up here.'}
             </p>
-            <Link to="/run-test" className="btn-primary btn-sm"><Plus size={14} /> Create Manual Run</Link>
+            <button
+              className="btn-primary btn-sm"
+              onClick={() => {
+                const pid = getCurrentProjectId();
+                navigate(pid ? `/projects/${pid}/test-runs/new` : '/projects');
+              }}
+            ><Plus size={14} /> Create Manual Run</button>
           </div>
         )}
 

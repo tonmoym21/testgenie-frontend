@@ -248,6 +248,13 @@ class ApiService {
   async updateFolder(projectId, folderId, data) { return this.request('PATCH', `/projects/${projectId}/folders/${folderId}`, data); }
   async deleteFolder(projectId, folderId) { return this.request('DELETE', `/projects/${projectId}/folders/${folderId}`); }
 
+  // ── Test Runs ─────────────────────────────────────────────────────────────
+  async listTestRuns(projectId, params = {}) { const q = new URLSearchParams(params).toString(); return this.request('GET', `/projects/${projectId}/test-runs${q ? '?' + q : ''}`); }
+  async getTestRun(projectId, id) { return this.request('GET', `/projects/${projectId}/test-runs/${id}`); }
+  async createTestRun(projectId, data) { return this.request('POST', `/projects/${projectId}/test-runs`, data); }
+  async updateTestRun(projectId, id, data) { return this.request('PATCH', `/projects/${projectId}/test-runs/${id}`, data); }
+  async deleteTestRun(projectId, id) { return this.request('DELETE', `/projects/${projectId}/test-runs/${id}`); }
+
   // ── Test Cases ────────────────────────────────────────────────────────────
   async getTestCases(projectId, params = {}) { const q = new URLSearchParams(params).toString(); return this.request('GET', `/projects/${projectId}/testcases${q ? '?' + q : ''}`); }
   async createTestCase(projectId, data) { return this.request('POST', `/projects/${projectId}/testcases`, data); }
