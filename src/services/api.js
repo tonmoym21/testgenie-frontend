@@ -258,7 +258,7 @@ class ApiService {
   // ── Test Cases ────────────────────────────────────────────────────────────
   async getTestCases(projectId, params = {}) { const q = new URLSearchParams(params).toString(); return this.request('GET', `/projects/${projectId}/testcases${q ? '?' + q : ''}`); }
   async createTestCase(projectId, data) { return this.request('POST', `/projects/${projectId}/testcases`, data); }
-  async batchCreateTestCases(projectId, testCases) { return this.request('POST', `/projects/${projectId}/testcases/batch`, { testCases }); }
+  async batchCreateTestCases(projectId, testCases) { return this.request('POST', `/projects/${projectId}/testcases/batch/create`, { testCases }); }
   async updateTestCase(projectId, id, data) { return this.request('PATCH', `/projects/${projectId}/testcases/${id}`, data); }
   async deleteTestCase(projectId, id) { return this.request('DELETE', `/projects/${projectId}/testcases/${id}`); }
   async linkTestCaseToJira(projectId, id, issueKey, issueSummary) { return this.request('POST', `/projects/${projectId}/testcases/${id}/jira-link`, { issueKey, issueSummary }); }

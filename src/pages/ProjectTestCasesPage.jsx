@@ -227,18 +227,26 @@ export default function ProjectTestCasesPage() {
 
   const handleImportBatch = async (batch) => {
     const folderId = typeof selectedFolder === 'number' ? selectedFolder : null;
+    if (folderId) {
+      // Batch endpoint doesn't accept folderId — fall back to per-item create.
+      const created = [];
+      for (const tc of batch) {
+        const row = await api.createTestCase(projectId, {
+          title: tc.title, content: tc.content, priority: tc.priority, folderId,
+        });
+        created.push(row);
+      }
+      setTestCases((prev) => [...created, ...prev]);
+      return;
+    }
     const payload = batch.map((tc) => ({
-      title: tc.title,
-      content: tc.content,
-      priority: tc.priority,
-      ...(folderId ? { folderId } : {}),
+      title: tc.title, content: tc.content, priority: tc.priority,
     }));
     const res = await api.batchCreateTestCases(projectId, payload);
     const created = res?.data || res?.testCases || res || [];
     if (Array.isArray(created) && created.length) {
       setTestCases((prev) => [...created, ...prev]);
     } else {
-      // Fallback: reload list so imported items show up even if response shape differs.
       try {
         const tcs = await api.getTestCases(projectId, { limit: 200 });
         setTestCases(tcs.data || []);
