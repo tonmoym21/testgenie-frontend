@@ -6,6 +6,7 @@ import {
   FolderPlus, ChevronRight, ChevronDown, Download, Sparkles, BookOpen,
   Library, FileText, MoreHorizontal, Shield,
 } from 'lucide-react';
+import CreateTestCaseModal from '../components/CreateTestCaseModal';
 import { setCurrentProjectId } from '../utils/currentProject';
 
 const PRIORITY_STYLES = {
@@ -109,10 +110,6 @@ export default function ProjectTestCasesPage() {
 
   // Create TC modal
   const [showCreate, setShowCreate] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newContent, setNewContent] = useState('');
-  const [newPriority, setNewPriority] = useState('medium');
-  const [creating, setCreating] = useState(false);
 
   // Edit TC modal
   const [editingTc, setEditingTc] = useState(null);
@@ -225,19 +222,16 @@ export default function ProjectTestCasesPage() {
     finally { setFolderSaving(false); }
   };
 
-  const handleCreateTestCase = async (e) => {
-    e.preventDefault();
-    setCreating(true);
-    try {
-      const folderId = typeof selectedFolder === 'number' ? selectedFolder : null;
-      const tc = await api.createTestCase(projectId, {
-        title: newTitle, content: newContent, priority: newPriority,
-        folderId: folderId || undefined,
-      });
-      setTestCases((prev) => [tc, ...prev]);
-      setShowCreate(false); setNewTitle(''); setNewContent(''); setNewPriority('medium');
-    } catch (err) { setError(err.message); }
-    finally { setCreating(false); }
+  const handleCreateTestCase = async (payload, { keepOpen } = {}) => {
+    const folderId = typeof selectedFolder === 'number' ? selectedFolder : null;
+    const tc = await api.createTestCase(projectId, {
+      title: payload.title,
+      content: payload.content,
+      priority: payload.priority,
+      folderId: folderId || undefined,
+    });
+    setTestCases((prev) => [tc, ...prev]);
+    if (!keepOpen) setShowCreate(false);
   };
 
   const openEdit = (tc) => {
@@ -488,41 +482,14 @@ export default function ProjectTestCasesPage() {
 
       {/* Create TC modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowCreate(false)}>
-          <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between mb-4">
-              <h2 className="text-lg font-semibold text-surface-900">Create test case</h2>
-              <button onClick={() => setShowCreate(false)} className="icon-btn"><X size={16} /></button>
-            </div>
-            <form onSubmit={handleCreateTestCase} className="space-y-4">
-              <div>
-                <label className="label">Title</label>
-                <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="input" required autoFocus />
-              </div>
-              <div>
-                <label className="label">Steps / content</label>
-                <textarea value={newContent} onChange={(e) => setNewContent(e.target.value)} className="input font-mono text-sm" rows={6} required />
-              </div>
-              <div>
-                <label className="label">Priority</label>
-                <div className="flex gap-2 flex-wrap">
-                  {['low','medium','high','critical'].map((p) => (
-                    <button key={p} type="button" onClick={() => setNewPriority(p)}
-                      className={`badge capitalize cursor-pointer ${newPriority === p ? PRIORITY_STYLES[p] : 'bg-surface-50 text-surface-400 ring-1 ring-inset ring-surface-200'}`}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary">Cancel</button>
-                <button type="submit" disabled={creating} className="btn-primary">
-                  {creating && <Loader2 size={14} className="animate-spin" />} Create
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <CreateTestCaseModal
+          folderName={(() => {
+            if (typeof selectedFolder !== 'number') return null;
+            return folders.find((f) => f.id === selectedFolder)?.name || null;
+          })()}
+          onClose={() => setShowCreate(false)}
+          onSubmit={handleCreateTestCase}
+        />
       )}
 
       {/* Edit TC modal */}
