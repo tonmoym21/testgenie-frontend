@@ -242,6 +242,12 @@ class ApiService {
   async updateProject(id, data) { return this.request('PATCH', `/projects/${id}`, data); }
   async deleteProject(id) { return this.request('DELETE', `/projects/${id}`); }
 
+  // ── Folders ───────────────────────────────────────────────────────────────
+  async getFolders(projectId) { return this.request('GET', `/projects/${projectId}/folders`); }
+  async createFolder(projectId, data) { return this.request('POST', `/projects/${projectId}/folders`, data); }
+  async updateFolder(projectId, folderId, data) { return this.request('PATCH', `/projects/${projectId}/folders/${folderId}`, data); }
+  async deleteFolder(projectId, folderId) { return this.request('DELETE', `/projects/${projectId}/folders/${folderId}`); }
+
   // ── Test Cases ────────────────────────────────────────────────────────────
   async getTestCases(projectId, params = {}) { const q = new URLSearchParams(params).toString(); return this.request('GET', `/projects/${projectId}/testcases${q ? '?' + q : ''}`); }
   async createTestCase(projectId, data) { return this.request('POST', `/projects/${projectId}/testcases`, data); }

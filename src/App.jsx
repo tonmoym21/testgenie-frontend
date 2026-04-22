@@ -11,6 +11,7 @@ import AutomationDashboardPage from './pages/AutomationDashboardPage';
 import RunReportDetailPage from './pages/RunReportDetailPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import ProjectTestCasesPage from './pages/ProjectTestCasesPage';
 import ExecutionsPage from './pages/ExecutionsPage';
 import ExecutionDetailPage from './pages/ExecutionDetailPage';
 import RunTestPage from './pages/RunTestPage';
@@ -24,6 +25,11 @@ import TeamPage from './pages/TeamPage';
 import AcceptInvitePage from './pages/AcceptInvitePage';
 import GlobalsPage from './pages/GlobalsPage';
 import JiraPage from './pages/JiraPage';
+import TestPlansPage from './pages/TestPlansPage';
+import SettingsPage from './pages/SettingsPage';
+import ReportsPage from './pages/ReportsPage';
+import IntegrationsPage from './pages/IntegrationsPage';
+import TestCasesRedirect from './pages/TestCasesRedirect';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -44,46 +50,56 @@ export default function App() {
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
-      {/* Dashboard routes (sub-dashboards still accessible via deep links) */}
+      {/* Dashboards */}
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/dashboard/api" element={<ProtectedRoute><ApiDashboardPage /></ProtectedRoute>} />
       <Route path="/dashboard/automation" element={<ProtectedRoute><AutomationDashboardPage /></ProtectedRoute>} />
-      
-      {/* Run Reports */}
+
+      {/* Reports */}
+      <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
       <Route path="/reports/:reportId" element={<ProtectedRoute><RunReportDetailPage /></ProtectedRoute>} />
 
       {/* Projects */}
       <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
-      <Route path="/projects/:projectId" element={<ProtectedRoute><ProjectDetailPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId" element={<ProtectedRoute><ProjectTestCasesPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/test-cases" element={<ProtectedRoute><ProjectTestCasesPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/legacy" element={<ProtectedRoute><ProjectDetailPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/stories/new" element={<ProtectedRoute><CreateStoryPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/stories/:storyId" element={<ProtectedRoute><StoryDetailPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/automation" element={<ProtectedRoute><AutomationPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/automation/:assetId" element={<ProtectedRoute><AutomationAssetDetailPage /></ProtectedRoute>} />
 
-      {/* Core features */}
+      {/* Top-level Test Cases — redirects to current project */}
+      <Route path="/test-cases" element={<ProtectedRoute><TestCasesRedirect /></ProtectedRoute>} />
+
+      {/* Test Runs */}
+      <Route path="/test-runs" element={<ProtectedRoute><ExecutionsPage /></ProtectedRoute>} />
+      <Route path="/executions" element={<ProtectedRoute><ExecutionsPage /></ProtectedRoute>} />
+      <Route path="/executions/:executionId" element={<ProtectedRoute><ExecutionDetailPage /></ProtectedRoute>} />
+
+      {/* Test Plans */}
+      <Route path="/test-plans" element={<ProtectedRoute><TestPlansPage /></ProtectedRoute>} />
+
+      {/* Integrations */}
+      <Route path="/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
+      <Route path="/jira" element={<ProtectedRoute><JiraPage /></ProtectedRoute>} />
+
+      {/* Settings (Team / Environments / Globals) */}
+      <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+      <Route path="/team" element={<ProtectedRoute><TeamPage /></ProtectedRoute>} />
+      <Route path="/environments" element={<ProtectedRoute><EnvironmentsPage /></ProtectedRoute>} />
+      <Route path="/globals" element={<ProtectedRoute><GlobalsPage /></ProtectedRoute>} />
+
+      {/* Legacy / other */}
       <Route path="/run-test" element={<ProtectedRoute><RunTestPage /></ProtectedRoute>} />
       <Route path="/collections" element={<ProtectedRoute><CollectionsPage /></ProtectedRoute>} />
       <Route path="/collections/:collectionId" element={<ProtectedRoute><CollectionDetailPage /></ProtectedRoute>} />
-      <Route path="/environments" element={<ProtectedRoute><EnvironmentsPage /></ProtectedRoute>} />
       <Route path="/schedules" element={<ProtectedRoute><SchedulesPage /></ProtectedRoute>} />
-      <Route path="/executions" element={<ProtectedRoute><ExecutionsPage /></ProtectedRoute>} />
-      <Route path="/executions/:executionId" element={<ProtectedRoute><ExecutionDetailPage /></ProtectedRoute>} />
-      
-      {/* Stories (top-level) */}
       <Route path="/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />
-      
-      {/* Automation (top-level) */}
       <Route path="/automation" element={<ProtectedRoute><AutomationPage /></ProtectedRoute>} />
 
-      {/* Team */}
-      <Route path="/team" element={<ProtectedRoute><TeamPage /></ProtectedRoute>} />
-
-      {/* v2.3: Global variables + Jira */}
-      <Route path="/globals" element={<ProtectedRoute><GlobalsPage /></ProtectedRoute>} />
-      <Route path="/jira" element={<ProtectedRoute><JiraPage /></ProtectedRoute>} />
-
-      {/* Catch-all redirect */}
+      {/* Catch-all */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

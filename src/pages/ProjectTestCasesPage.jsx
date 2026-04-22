@@ -1,0 +1,595 @@
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { api } from '../services/api';
+import {
+  ArrowLeft, Plus, Loader2, Trash2, Pencil, X, Search, Folder, FolderOpen,
+  FolderPlus, ChevronRight, ChevronDown, Download, Sparkles, BookOpen,
+  Library, FileText, MoreHorizontal, Shield,
+} from 'lucide-react';
+import { setCurrentProjectId } from '../utils/currentProject';
+
+const PRIORITY_STYLES = {
+  critical: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/15',
+  high:     'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/15',
+  medium:   'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/15',
+  low:      'bg-surface-100 text-surface-600 ring-1 ring-inset ring-surface-300/40',
+};
+
+// Build a tree from a flat array of folders keyed by parent_id.
+function buildTree(folders) {
+  const byParent = new Map();
+  for (const f of folders) {
+    const key = f.parentId ?? null;
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key).push(f);
+  }
+  const walk = (parentId) => {
+    const children = byParent.get(parentId) || [];
+    return children.map((c) => ({ ...c, children: walk(c.id) }));
+  };
+  return walk(null);
+}
+
+function FolderNode({ node, depth, expanded, toggle, selected, onSelect, countFor, onRename, onDelete, onAddChild }) {
+  const isExpanded = expanded.has(node.id);
+  const hasChildren = node.children.length > 0;
+  const isSelected = selected === node.id;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  useEffect(() => {
+    const onClick = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+  return (
+    <div>
+      <div
+        className={`group flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer text-sm relative ${
+          isSelected ? 'bg-brand-50 text-brand-800' : 'hover:bg-surface-100 text-surface-700'
+        }`}
+        style={{ paddingLeft: 8 + depth * 14 }}
+        onClick={() => onSelect(node.id)}
+      >
+        <button
+          type="button"
+          className="w-4 h-4 flex items-center justify-center text-surface-400 shrink-0"
+          onClick={(e) => { e.stopPropagation(); toggle(node.id); }}
+          aria-label={isExpanded ? 'Collapse folder' : 'Expand folder'}
+        >
+          {hasChildren ? (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : <span className="w-3" />}
+        </button>
+        {isExpanded && hasChildren ? <FolderOpen size={14} className="text-amber-500 shrink-0" /> : <Folder size={14} className="text-amber-500 shrink-0" />}
+        <span className="truncate flex-1">{node.name}</span>
+        <span className="text-[11px] text-surface-400 tabular-nums">{countFor(node.id)}</span>
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            className="opacity-0 group-hover:opacity-100 icon-btn shrink-0 w-6 h-6"
+            onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+            aria-label="Folder options"
+          >
+            <MoreHorizontal size={14} />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-full mt-1 bg-white border border-surface-200 rounded-lg shadow-soft-lg z-20 w-40 py-1 text-sm">
+              <button className="w-full text-left px-3 py-1.5 hover:bg-surface-50" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onAddChild(node.id); }}>Add sub-folder</button>
+              <button className="w-full text-left px-3 py-1.5 hover:bg-surface-50" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRename(node); }}>Rename</button>
+              <button className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(node); }}>Delete</button>
+            </div>
+          )}
+        </div>
+      </div>
+      {isExpanded && node.children.map((c) => (
+        <FolderNode key={c.id} node={c} depth={depth + 1} expanded={expanded} toggle={toggle}
+          selected={selected} onSelect={onSelect} countFor={countFor}
+          onRename={onRename} onDelete={onDelete} onAddChild={onAddChild} />
+      ))}
+    </div>
+  );
+}
+
+export default function ProjectTestCasesPage() {
+  const { projectId } = useParams();
+  const navigate = useNavigate();
+  const [project, setProject] = useState(null);
+  const [folders, setFolders] = useState([]);
+  const [testCases, setTestCases] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Selection in tree: 'all' | 'none' | <folderId>
+  const [selectedFolder, setSelectedFolder] = useState('all');
+  const [expanded, setExpanded] = useState(() => new Set());
+  const [query, setQuery] = useState('');
+
+  // Folder modals
+  const [folderModal, setFolderModal] = useState(null); // { mode: 'create'|'rename', parentId?, folder? }
+  const [folderName, setFolderName] = useState('');
+  const [folderSaving, setFolderSaving] = useState(false);
+
+  // Create TC modal
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newContent, setNewContent] = useState('');
+  const [newPriority, setNewPriority] = useState('medium');
+  const [creating, setCreating] = useState(false);
+
+  // Edit TC modal
+  const [editingTc, setEditingTc] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editPriority, setEditPriority] = useState('medium');
+  const [saving, setSaving] = useState(false);
+
+  // Create dropdown
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const createMenuRef = useRef(null);
+  useEffect(() => {
+    const onClick = (e) => { if (createMenuRef.current && !createMenuRef.current.contains(e.target)) setCreateMenuOpen(false); };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
+  useEffect(() => { if (projectId) setCurrentProjectId(projectId); }, [projectId]);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [proj, fs, tcs] = await Promise.all([
+        api.getProject(projectId),
+        api.getFolders(projectId).catch(() => ({ data: [] })),
+        api.getTestCases(projectId, { limit: 200 }),
+      ]);
+      setProject(proj);
+      setFolders(fs.data || []);
+      setTestCases(tcs.data || []);
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
+  }, [projectId]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const tree = useMemo(() => buildTree(folders), [folders]);
+
+  const countFor = useMemo(() => {
+    const fn = (folderId) => {
+      const children = folders.filter((f) => f.parentId === folderId).map((f) => f.id);
+      let own = testCases.filter((tc) => tc.folderId === folderId).length;
+      for (const c of children) own += fn(c);
+      return own;
+    };
+    return fn;
+  }, [folders, testCases]);
+
+  const visibleTestCases = useMemo(() => {
+    let list = testCases;
+    if (selectedFolder === 'none') list = list.filter((tc) => tc.folderId == null);
+    else if (selectedFolder !== 'all') {
+      // include descendants of the selected folder
+      const ids = new Set([Number(selectedFolder)]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const f of folders) {
+          if (f.parentId != null && ids.has(f.parentId) && !ids.has(f.id)) {
+            ids.add(f.id); grew = true;
+          }
+        }
+      }
+      list = list.filter((tc) => tc.folderId != null && ids.has(tc.folderId));
+    }
+    const q = query.trim().toLowerCase();
+    if (q) list = list.filter((tc) => (tc.title + ' ' + tc.content).toLowerCase().includes(q));
+    return list;
+  }, [testCases, folders, selectedFolder, query]);
+
+  const toggle = (id) => {
+    setExpanded((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const handleAddRootFolder = () => { setFolderModal({ mode: 'create', parentId: null }); setFolderName(''); };
+  const handleAddChildFolder = (parentId) => {
+    setFolderModal({ mode: 'create', parentId });
+    setFolderName('');
+    setExpanded((prev) => new Set(prev).add(parentId));
+  };
+  const handleRenameFolder = (folder) => { setFolderModal({ mode: 'rename', folder }); setFolderName(folder.name); };
+  const handleDeleteFolder = async (folder) => {
+    if (!confirm(`Delete folder "${folder.name}"? Test cases inside will be un-foldered.`)) return;
+    try {
+      await api.deleteFolder(projectId, folder.id);
+      setFolders((prev) => prev.filter((f) => f.id !== folder.id && f.parentId !== folder.id));
+      setTestCases((prev) => prev.map((tc) => tc.folderId === folder.id ? { ...tc, folderId: null } : tc));
+      if (selectedFolder === folder.id) setSelectedFolder('all');
+    } catch (err) { setError(err.message); }
+  };
+
+  const submitFolderModal = async (e) => {
+    e.preventDefault();
+    if (!folderName.trim()) return;
+    setFolderSaving(true);
+    try {
+      if (folderModal.mode === 'create') {
+        const f = await api.createFolder(projectId, { name: folderName.trim(), parentId: folderModal.parentId });
+        setFolders((prev) => [...prev, f]);
+        setSelectedFolder(f.id);
+      } else {
+        const f = await api.updateFolder(projectId, folderModal.folder.id, { name: folderName.trim() });
+        setFolders((prev) => prev.map((x) => (x.id === f.id ? f : x)));
+      }
+      setFolderModal(null);
+    } catch (err) { setError(err.message); }
+    finally { setFolderSaving(false); }
+  };
+
+  const handleCreateTestCase = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    try {
+      const folderId = typeof selectedFolder === 'number' ? selectedFolder : null;
+      const tc = await api.createTestCase(projectId, {
+        title: newTitle, content: newContent, priority: newPriority,
+        folderId: folderId || undefined,
+      });
+      setTestCases((prev) => [tc, ...prev]);
+      setShowCreate(false); setNewTitle(''); setNewContent(''); setNewPriority('medium');
+    } catch (err) { setError(err.message); }
+    finally { setCreating(false); }
+  };
+
+  const openEdit = (tc) => {
+    setEditingTc(tc); setEditTitle(tc.title); setEditContent(tc.content); setEditPriority(tc.priority);
+  };
+  const handleEditTestCase = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const updated = await api.updateTestCase(projectId, editingTc.id, {
+        title: editTitle, content: editContent, priority: editPriority,
+      });
+      setTestCases((prev) => prev.map((tc) => (tc.id === editingTc.id ? updated : tc)));
+      setEditingTc(null);
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+  const handleDeleteTestCase = async (id) => {
+    if (!confirm('Delete this test case?')) return;
+    try {
+      await api.deleteTestCase(projectId, id);
+      setTestCases((prev) => prev.filter((tc) => tc.id !== id));
+    } catch (err) { setError(err.message); }
+  };
+
+  const handleMoveTestCase = async (tc, folderId) => {
+    try {
+      const updated = await api.updateTestCase(projectId, tc.id, { folderId: folderId || null });
+      setTestCases((prev) => prev.map((x) => (x.id === tc.id ? updated : x)));
+    } catch (err) { setError(err.message); }
+  };
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
+      {/* Page header */}
+      <div className="px-6 pt-5 pb-3 border-b border-surface-200/70 bg-white/80">
+        <Link to="/projects" className="inline-flex items-center gap-1.5 text-xs text-surface-500 hover:text-surface-800 mb-2 transition-colors">
+          <ArrowLeft size={12} /> Back to projects
+        </Link>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold text-surface-900 truncate">{loading ? 'Loading…' : project?.name || 'Test Cases'}</h1>
+            {project?.description && <p className="text-sm text-surface-500 mt-0.5 line-clamp-1">{project.description}</p>}
+          </div>
+          <div className="flex items-center gap-2" ref={createMenuRef}>
+            <button className="btn-secondary btn-sm" onClick={() => navigate(`/projects/${projectId}/stories`)}>
+              <BookOpen size={14} /> Stories
+            </button>
+            <button className="btn-secondary btn-sm" onClick={() => navigate('/collections')}>
+              <Library size={14} /> Collections
+            </button>
+            <button className="btn-secondary btn-sm">
+              <Download size={14} /> Export
+            </button>
+            <button className="btn-primary btn-sm" disabled title="Generate with AI — coming soon">
+              <Sparkles size={14} /> Generate with AI
+            </button>
+            <div className="relative inline-flex">
+              <button className="btn-primary btn-sm rounded-r-none" onClick={() => setShowCreate(true)}>
+                <Plus size={14} /> Create Test Case
+              </button>
+              <button
+                className="btn-primary btn-sm rounded-l-none border-l border-white/30 px-2"
+                onClick={() => setCreateMenuOpen((v) => !v)}
+                aria-label="Create options"
+              >
+                <ChevronDown size={14} />
+              </button>
+              {createMenuOpen && (
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-surface-200 rounded-lg shadow-soft-lg z-30 py-1 text-sm">
+                  <button
+                    onClick={() => { setCreateMenuOpen(false); setShowCreate(true); }}
+                    className="w-full text-left px-3 py-2 hover:bg-surface-50 flex items-start gap-2"
+                  >
+                    <FileText size={14} className="mt-0.5 text-surface-500" />
+                    <span>
+                      <span className="block font-medium text-surface-900">From scratch</span>
+                      <span className="block text-xs text-surface-500">Write a test case manually.</span>
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => { setCreateMenuOpen(false); navigate(`/projects/${projectId}/stories`); }}
+                    className="w-full text-left px-3 py-2 hover:bg-surface-50 flex items-start gap-2"
+                  >
+                    <BookOpen size={14} className="mt-0.5 text-surface-500" />
+                    <span>
+                      <span className="block font-medium text-surface-900">From a story</span>
+                      <span className="block text-xs text-surface-500">Generate scenarios from an existing user story.</span>
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => { setCreateMenuOpen(false); navigate('/collections'); }}
+                    className="w-full text-left px-3 py-2 hover:bg-surface-50 flex items-start gap-2"
+                  >
+                    <Library size={14} className="mt-0.5 text-surface-500" />
+                    <span>
+                      <span className="block font-medium text-surface-900">From API collection</span>
+                      <span className="block text-xs text-surface-500">Import a Postman collection and auto-generate cases.</span>
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div role="alert" className="mx-6 mt-3 bg-red-50 text-red-700 text-sm px-4 py-2 rounded-lg border border-red-200 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError('')} className="text-red-500 hover:text-red-700"><X size={14} /></button>
+        </div>
+      )}
+
+      {/* Workspace split */}
+      <div className="flex-1 flex min-h-0">
+        {/* Folder tree */}
+        <aside className="w-72 border-r border-surface-200/70 bg-white overflow-y-auto">
+          <div className="flex items-center justify-between px-3 py-3 border-b border-surface-200/70 sticky top-0 bg-white z-10">
+            <span className="text-xs font-semibold uppercase tracking-wider text-surface-500">Folders</span>
+            <button className="icon-btn" title="New folder" onClick={handleAddRootFolder}>
+              <FolderPlus size={15} />
+            </button>
+          </div>
+          <div className="py-2">
+            <button
+              onClick={() => setSelectedFolder('all')}
+              className={`w-full flex items-center gap-2 px-4 py-1.5 text-sm ${selectedFolder === 'all' ? 'bg-brand-50 text-brand-800 font-medium' : 'text-surface-700 hover:bg-surface-100'}`}
+            >
+              <Folder size={14} className="text-surface-400" />
+              <span className="flex-1 text-left">All test cases</span>
+              <span className="text-[11px] text-surface-400 tabular-nums">{testCases.length}</span>
+            </button>
+            <button
+              onClick={() => setSelectedFolder('none')}
+              className={`w-full flex items-center gap-2 px-4 py-1.5 text-sm ${selectedFolder === 'none' ? 'bg-brand-50 text-brand-800 font-medium' : 'text-surface-700 hover:bg-surface-100'}`}
+            >
+              <Folder size={14} className="text-surface-400" />
+              <span className="flex-1 text-left">Unassigned</span>
+              <span className="text-[11px] text-surface-400 tabular-nums">{testCases.filter((tc) => tc.folderId == null).length}</span>
+            </button>
+            <div className="px-1 pt-1">
+              {tree.length === 0 ? (
+                <p className="text-xs text-surface-400 px-3 py-4 italic">
+                  No folders yet. Create folders to organize test cases.
+                </p>
+              ) : (
+                tree.map((node) => (
+                  <FolderNode
+                    key={node.id}
+                    node={node}
+                    depth={0}
+                    expanded={expanded}
+                    toggle={toggle}
+                    selected={selectedFolder}
+                    onSelect={setSelectedFolder}
+                    countFor={countFor}
+                    onRename={handleRenameFolder}
+                    onDelete={handleDeleteFolder}
+                    onAddChild={handleAddChildFolder}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        </aside>
+
+        {/* Test case list */}
+        <section className="flex-1 min-w-0 overflow-y-auto bg-surface-50">
+          {/* Toolbar */}
+          <div className="sticky top-0 z-10 bg-white border-b border-surface-200/70 px-5 py-3 flex items-center gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
+              <input
+                type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by Test Case ID or Title"
+                className="input pl-9 py-1.5 text-sm"
+              />
+            </div>
+            <span className="text-sm text-surface-500">{visibleTestCases.length} of {testCases.length}</span>
+          </div>
+
+          {/* Column header */}
+          <div className="px-5 py-2 bg-surface-100/60 border-b border-surface-200/70 grid grid-cols-12 gap-3 text-[11px] font-semibold uppercase tracking-wider text-surface-500">
+            <div className="col-span-1">ID</div>
+            <div className="col-span-6">Title</div>
+            <div className="col-span-2">Priority</div>
+            <div className="col-span-2">Folder</div>
+            <div className="col-span-1 text-right">Actions</div>
+          </div>
+
+          {loading && (
+            <div className="p-5 space-y-2">
+              {[1,2,3,4].map((i) => <div key={i} className="skeleton h-9 w-full" />)}
+            </div>
+          )}
+
+          {!loading && visibleTestCases.length === 0 && (
+            <div className="empty mt-12">
+              <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4"><Shield size={24} /></div>
+              <h3 className="text-lg font-semibold text-surface-800 mb-1">No test cases here</h3>
+              <p className="text-surface-500 text-sm mb-6 max-w-xs">
+                {selectedFolder === 'all'
+                  ? 'Start by creating your first test case or importing from a story or API collection.'
+                  : 'This folder is empty. Create a test case or move one in from another folder.'}
+              </p>
+              <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm"><Plus size={14} /> Create Test Case</button>
+            </div>
+          )}
+
+          {!loading && visibleTestCases.length > 0 && (
+            <div className="divide-y divide-surface-200/70 bg-white">
+              {visibleTestCases.map((tc) => {
+                const folder = folders.find((f) => f.id === tc.folderId);
+                return (
+                  <div key={tc.id} className="px-5 py-3 grid grid-cols-12 gap-3 items-center hover:bg-surface-50 transition-colors">
+                    <div className="col-span-1 text-xs font-mono text-surface-500">TC-{tc.id}</div>
+                    <div className="col-span-6 min-w-0">
+                      <button onClick={() => openEdit(tc)} className="text-left w-full">
+                        <div className="text-sm font-medium text-surface-900 truncate">{tc.title}</div>
+                        <div className="text-xs text-surface-500 truncate">{tc.content}</div>
+                      </button>
+                    </div>
+                    <div className="col-span-2">
+                      <span className={`badge ${PRIORITY_STYLES[tc.priority]} capitalize`}>{tc.priority}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <select
+                        value={tc.folderId ?? ''}
+                        onChange={(e) => handleMoveTestCase(tc, e.target.value ? parseInt(e.target.value, 10) : null)}
+                        className="text-xs border border-surface-200 rounded-md px-2 py-1 bg-white w-full"
+                      >
+                        <option value="">Unassigned</option>
+                        {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="col-span-1 flex items-center justify-end gap-1">
+                      <button onClick={() => openEdit(tc)} className="icon-btn" aria-label="Edit"><Pencil size={13} /></button>
+                      <button onClick={() => handleDeleteTestCase(tc.id)} className="icon-btn hover:text-red-500" aria-label="Delete"><Trash2 size={13} /></button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* Create TC modal */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowCreate(false)}>
+          <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <h2 className="text-lg font-semibold text-surface-900">Create test case</h2>
+              <button onClick={() => setShowCreate(false)} className="icon-btn"><X size={16} /></button>
+            </div>
+            <form onSubmit={handleCreateTestCase} className="space-y-4">
+              <div>
+                <label className="label">Title</label>
+                <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="input" required autoFocus />
+              </div>
+              <div>
+                <label className="label">Steps / content</label>
+                <textarea value={newContent} onChange={(e) => setNewContent(e.target.value)} className="input font-mono text-sm" rows={6} required />
+              </div>
+              <div>
+                <label className="label">Priority</label>
+                <div className="flex gap-2 flex-wrap">
+                  {['low','medium','high','critical'].map((p) => (
+                    <button key={p} type="button" onClick={() => setNewPriority(p)}
+                      className={`badge capitalize cursor-pointer ${newPriority === p ? PRIORITY_STYLES[p] : 'bg-surface-50 text-surface-400 ring-1 ring-inset ring-surface-200'}`}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary">Cancel</button>
+                <button type="submit" disabled={creating} className="btn-primary">
+                  {creating && <Loader2 size={14} className="animate-spin" />} Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit TC modal */}
+      {editingTc && (
+        <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setEditingTc(null)}>
+          <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <h2 className="text-lg font-semibold text-surface-900">Edit test case</h2>
+              <button onClick={() => setEditingTc(null)} className="icon-btn"><X size={16} /></button>
+            </div>
+            <form onSubmit={handleEditTestCase} className="space-y-4">
+              <div>
+                <label className="label">Title</label>
+                <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="input" required />
+              </div>
+              <div>
+                <label className="label">Steps / content</label>
+                <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="input font-mono text-sm" rows={6} required />
+              </div>
+              <div>
+                <label className="label">Priority</label>
+                <div className="flex gap-2 flex-wrap">
+                  {['low','medium','high','critical'].map((p) => (
+                    <button key={p} type="button" onClick={() => setEditPriority(p)}
+                      className={`badge capitalize cursor-pointer ${editPriority === p ? PRIORITY_STYLES[p] : 'bg-surface-50 text-surface-400 ring-1 ring-inset ring-surface-200'}`}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setEditingTc(null)} className="btn-secondary">Cancel</button>
+                <button type="submit" disabled={saving} className="btn-primary">
+                  {saving && <Loader2 size={14} className="animate-spin" />} Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Folder modal */}
+      {folderModal && (
+        <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setFolderModal(null)}>
+          <div className="card p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <h2 className="text-lg font-semibold text-surface-900">
+                {folderModal.mode === 'create' ? (folderModal.parentId ? 'New sub-folder' : 'New folder') : 'Rename folder'}
+              </h2>
+              <button onClick={() => setFolderModal(null)} className="icon-btn"><X size={16} /></button>
+            </div>
+            <form onSubmit={submitFolderModal} className="space-y-4">
+              <div>
+                <label className="label">Name</label>
+                <input value={folderName} onChange={(e) => setFolderName(e.target.value)} className="input" required autoFocus />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setFolderModal(null)} className="btn-secondary">Cancel</button>
+                <button type="submit" disabled={folderSaving} className="btn-primary">
+                  {folderSaving && <Loader2 size={14} className="animate-spin" />}
+                  {folderModal.mode === 'create' ? 'Create' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

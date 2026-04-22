@@ -4,42 +4,23 @@ import { useAuth } from '../context/AuthContext';
 import {
   Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings,
   Clock, Bot, Users, Search, ChevronsLeft, ChevronsRight, ChevronDown,
-  Sparkles, HelpCircle
+  Sparkles, HelpCircle, FileText, ClipboardList, Puzzle, BookOpen,
 } from 'lucide-react';
 
-// Grouped navigation — less busy, clearer intent
+// BrowserStack-style IA — single flat list like the reference screenshot.
+// `match` extends active highlighting to project-scoped sub-paths.
 const NAV_GROUPS = [
   {
-    label: 'Observe',
+    label: null,
     items: [
-      { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
-      { path: '/executions', label: 'Executions', icon: Play },
-    ],
-  },
-  {
-    label: 'Build',
-    items: [
-      { path: '/projects', label: 'Projects', icon: FolderOpen },
-    ],
-  },
-  {
-    label: 'Execute',
-    items: [
-      { path: '/run-test', label: 'Run Test', icon: Zap },
-      { path: '/collections', label: 'Collections', icon: Library },
-      { path: '/schedules', label: 'Schedules', icon: Clock },
-    ],
-  },
-  {
-    label: 'Automate',
-    items: [
-      { path: '/automation', label: 'Automation', icon: Bot },
-    ],
-  },
-  {
-    label: 'Configure',
-    items: [
-      { path: '/environments', label: 'Environments', icon: Settings },
+      { path: '/dashboard', label: 'Dashboards', icon: BarChart3, match: ['/dashboard'] },
+      { path: '/reports', label: 'Reports', icon: FileText, match: ['/reports'] },
+      { path: '/projects', label: 'Projects', icon: FolderOpen, match: ['/projects'] },
+      { path: '/test-cases', label: 'Test Cases', icon: ClipboardList, match: ['/test-cases', '/projects/:id/test-cases'] },
+      { path: '/test-runs', label: 'Test Runs', icon: Play, match: ['/test-runs', '/executions'] },
+      { path: '/test-plans', label: 'Test Plans', icon: BookOpen, match: ['/test-plans'] },
+      { path: '/integrations', label: 'Integrations', icon: Puzzle, match: ['/integrations', '/jira'] },
+      { path: '/settings', label: 'Settings', icon: Settings, match: ['/settings', '/team', '/environments', '/globals'] },
     ],
   },
 ];
@@ -98,17 +79,18 @@ export default function Layout({ children }) {
 
   const handleLogout = async () => { await logout(); navigate('/login'); };
 
-  const isActive = (path) =>
-    location.pathname === path ||
-    (path !== '/dashboard' && location.pathname.startsWith(path));
-
-  const groups = useMemo(() => {
-    const g = [...NAV_GROUPS];
-    if (canManageTeam) {
-      g.push({ label: 'Admin', items: [{ path: '/team', label: 'Team', icon: Users }] });
+  const pathname = location.pathname;
+  const isActive = (item) => {
+    const patterns = item.match || [item.path];
+    for (const p of patterns) {
+      // Treat ":id" as a wildcard segment
+      const re = new RegExp('^' + p.replace(/:[^/]+/g, '[^/]+') + '(/|$)');
+      if (re.test(pathname)) return true;
     }
-    return g;
-  }, [canManageTeam]);
+    return false;
+  };
+
+  const groups = useMemo(() => NAV_GROUPS, []);
 
   const initial = (user?.email || '?').charAt(0).toUpperCase();
   const sidebarW = collapsed ? 'w-[72px]' : 'w-64';
@@ -136,9 +118,9 @@ export default function Layout({ children }) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto scroll-area" aria-label="Primary">
-          {groups.map((group) => (
-            <div key={group.label}>
-              {!collapsed && (
+          {groups.map((group, gi) => (
+            <div key={group.label || `g${gi}`}>
+              {!collapsed && group.label && (
                 <div className="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-400/80">
                   {group.label}
                 </div>
@@ -150,7 +132,7 @@ export default function Layout({ children }) {
                     to={item.path}
                     label={item.label}
                     icon={item.icon}
-                    active={isActive(item.path)}
+                    active={isActive(item)}
                     collapsed={collapsed}
                   />
                 ))}
