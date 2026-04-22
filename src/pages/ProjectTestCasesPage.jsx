@@ -4,9 +4,10 @@ import { api } from '../services/api';
 import {
   ArrowLeft, Plus, Loader2, Trash2, Pencil, X, Search, Folder, FolderOpen,
   FolderPlus, ChevronRight, ChevronDown, Download, Sparkles, BookOpen,
-  Library, FileText, MoreHorizontal, Shield,
+  Library, FileText, MoreHorizontal, Shield, Upload,
 } from 'lucide-react';
 import CreateTestCaseModal from '../components/CreateTestCaseModal';
+import ImportTestCasesModal from '../components/ImportTestCasesModal';
 import { setCurrentProjectId } from '../utils/currentProject';
 
 const PRIORITY_STYLES = {
@@ -110,6 +111,8 @@ export default function ProjectTestCasesPage() {
 
   // Create TC modal
   const [showCreate, setShowCreate] = useState(false);
+  // Import TC modal
+  const [showImport, setShowImport] = useState(false);
 
   // Edit TC modal
   const [editingTc, setEditingTc] = useState(null);
@@ -222,6 +225,27 @@ export default function ProjectTestCasesPage() {
     finally { setFolderSaving(false); }
   };
 
+  const handleImportBatch = async (batch) => {
+    const folderId = typeof selectedFolder === 'number' ? selectedFolder : null;
+    const payload = batch.map((tc) => ({
+      title: tc.title,
+      content: tc.content,
+      priority: tc.priority,
+      ...(folderId ? { folderId } : {}),
+    }));
+    const res = await api.batchCreateTestCases(projectId, payload);
+    const created = res?.data || res?.testCases || res || [];
+    if (Array.isArray(created) && created.length) {
+      setTestCases((prev) => [...created, ...prev]);
+    } else {
+      // Fallback: reload list so imported items show up even if response shape differs.
+      try {
+        const tcs = await api.getTestCases(projectId, { limit: 200 });
+        setTestCases(tcs.data || []);
+      } catch {}
+    }
+  };
+
   const handleCreateTestCase = async (payload, { keepOpen } = {}) => {
     const folderId = typeof selectedFolder === 'number' ? selectedFolder : null;
     const tc = await api.createTestCase(projectId, {
@@ -283,6 +307,9 @@ export default function ProjectTestCasesPage() {
             <button className="btn-secondary btn-sm" onClick={() => navigate('/collections')}>
               <Library size={14} /> Collections
             </button>
+            <button className="btn-secondary btn-sm" onClick={() => setShowImport(true)}>
+              <Upload size={14} /> Import
+            </button>
             <button className="btn-secondary btn-sm">
               <Download size={14} /> Export
             </button>
@@ -330,6 +357,17 @@ export default function ProjectTestCasesPage() {
                     <span>
                       <span className="block font-medium text-surface-900">From API collection</span>
                       <span className="block text-xs text-surface-500">Import a Postman collection and auto-generate cases.</span>
+                    </span>
+                  </button>
+                  <div className="border-t border-surface-200/70 my-1" />
+                  <button
+                    onClick={() => { setCreateMenuOpen(false); setShowImport(true); }}
+                    className="w-full text-left px-3 py-2 hover:bg-surface-50 flex items-start gap-2"
+                  >
+                    <Upload size={14} className="mt-0.5 text-surface-500" />
+                    <span>
+                      <span className="block font-medium text-surface-900">Import from BrowserStack / CSV</span>
+                      <span className="block text-xs text-surface-500">Upload a CSV or JSON export from BrowserStack, TestRail, Zephyr, or Xray.</span>
                     </span>
                   </button>
                 </div>
@@ -479,6 +517,18 @@ export default function ProjectTestCasesPage() {
           )}
         </section>
       </div>
+
+      {/* Import TC modal */}
+      {showImport && (
+        <ImportTestCasesModal
+          folderName={(() => {
+            if (typeof selectedFolder !== 'number') return null;
+            return folders.find((f) => f.id === selectedFolder)?.name || null;
+          })()}
+          onClose={() => setShowImport(false)}
+          onImport={handleImportBatch}
+        />
+      )}
 
       {/* Create TC modal */}
       {showCreate && (
