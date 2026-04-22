@@ -4,7 +4,7 @@ import { api } from '../services/api';
 import {
   ArrowLeft, Plus, Loader2, Trash2, Pencil, X, Search, Folder, FolderOpen,
   FolderPlus, ChevronRight, ChevronDown, Download, Sparkles, BookOpen,
-  Library, FileText, MoreHorizontal, Shield, Upload,
+  Library, FileText, MoreHorizontal, Shield, Upload, PlayCircle, Link as LinkIcon,
 } from 'lucide-react';
 import CreateTestCaseModal from '../components/CreateTestCaseModal';
 import ImportTestCasesModal from '../components/ImportTestCasesModal';
@@ -113,6 +113,13 @@ export default function ProjectTestCasesPage() {
   const [showCreate, setShowCreate] = useState(false);
   // Import TC modal
   const [showImport, setShowImport] = useState(false);
+  // Selection + bulk "Add to Run"
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [showAddToRun, setShowAddToRun] = useState(false);
+  const [testRuns, setTestRuns] = useState([]);
+  const [addToRunBusy, setAddToRunBusy] = useState(false);
+  // Jira quick-link on edit modal
+  const [jiraKey, setJiraKey] = useState('');
 
   // Edit TC modal
   const [editingTc, setEditingTc] = useState(null);
@@ -268,7 +275,62 @@ export default function ProjectTestCasesPage() {
 
   const openEdit = (tc) => {
     setEditingTc(tc); setEditTitle(tc.title); setEditContent(tc.content); setEditPriority(tc.priority);
+    setJiraKey(tc.jiraIssueKey || '');
   };
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+  const toggleSelectAllVisible = (visibleList) => {
+    setSelectedIds((prev) => {
+      const ids = visibleList.map((tc) => tc.id);
+      const allSelected = ids.every((id) => prev.has(id));
+      const n = new Set(prev);
+      if (allSelected) ids.forEach((id) => n.delete(id));
+      else ids.forEach((id) => n.add(id));
+      return n;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const openAddToRun = async () => {
+    try {
+      const res = await api.listTestRuns(projectId);
+      setTestRuns(res.data || []);
+      setShowAddToRun(true);
+    } catch (err) { setError(err.message); }
+  };
+  const doAddToRun = async (runId) => {
+    setAddToRunBusy(true);
+    try {
+      await api.addTestRunCases(projectId, runId, Array.from(selectedIds));
+      setShowAddToRun(false);
+      clearSelection();
+      navigate(`/projects/${projectId}/test-runs/${runId}`);
+    } catch (err) { setError(err.message); }
+    finally { setAddToRunBusy(false); }
+  };
+  const doCreateRunWithSelection = async () => {
+    navigate(`/projects/${projectId}/test-runs/new?caseIds=${Array.from(selectedIds).join(',')}`);
+  };
+
+  const handleLinkJira = async () => {
+    if (!editingTc) return;
+    try {
+      if (jiraKey.trim()) {
+        await api.linkTestCaseToJira(projectId, editingTc.id, jiraKey.trim(), '');
+        setTestCases((prev) => prev.map((x) => x.id === editingTc.id ? { ...x, jiraIssueKey: jiraKey.trim() } : x));
+      } else {
+        await api.unlinkTestCaseFromJira(projectId, editingTc.id);
+        setTestCases((prev) => prev.map((x) => x.id === editingTc.id ? { ...x, jiraIssueKey: null } : x));
+      }
+    } catch (err) { setError(err.message); }
+  };
+
   const handleEditTestCase = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -460,13 +522,32 @@ export default function ProjectTestCasesPage() {
             <span className="text-sm text-surface-500">{visibleTestCases.length} of {testCases.length}</span>
           </div>
 
+          {selectedIds.size > 0 && (
+            <div className="sticky top-[53px] z-10 bg-brand-50 border-b border-brand-200 px-5 py-2 flex items-center gap-3">
+              <span className="text-sm font-medium text-brand-800">{selectedIds.size} selected</span>
+              <button onClick={openAddToRun} className="btn-primary btn-sm">
+                <PlayCircle size={14}/> Add to Test Run
+              </button>
+              <button onClick={doCreateRunWithSelection} className="btn-secondary btn-sm">
+                <Plus size={14}/> New Run with selection
+              </button>
+              <button onClick={clearSelection} className="text-sm text-surface-600 hover:text-surface-900 ml-auto">Clear</button>
+            </div>
+          )}
+
           {/* Column header */}
-          <div className="px-5 py-2 bg-surface-100/60 border-b border-surface-200/70 grid grid-cols-12 gap-3 text-[11px] font-semibold uppercase tracking-wider text-surface-500">
-            <div className="col-span-1">ID</div>
-            <div className="col-span-6">Title</div>
-            <div className="col-span-2">Priority</div>
-            <div className="col-span-2">Folder</div>
-            <div className="col-span-1 text-right">Actions</div>
+          <div className="px-5 py-2 bg-surface-100/60 border-b border-surface-200/70 grid grid-cols-[24px_60px_1fr_120px_140px_80px] gap-3 items-center text-[11px] font-semibold uppercase tracking-wider text-surface-500">
+            <input
+              type="checkbox"
+              checked={visibleTestCases.length > 0 && visibleTestCases.every((tc) => selectedIds.has(tc.id))}
+              onChange={() => toggleSelectAllVisible(visibleTestCases)}
+              aria-label="Select all visible"
+            />
+            <div>ID</div>
+            <div>Title</div>
+            <div>Priority</div>
+            <div>Folder</div>
+            <div className="text-right">Actions</div>
           </div>
 
           {loading && (
@@ -493,18 +574,27 @@ export default function ProjectTestCasesPage() {
               {visibleTestCases.map((tc) => {
                 const folder = folders.find((f) => f.id === tc.folderId);
                 return (
-                  <div key={tc.id} className="px-5 py-3 grid grid-cols-12 gap-3 items-center hover:bg-surface-50 transition-colors">
-                    <div className="col-span-1 text-xs font-mono text-surface-500">TC-{tc.id}</div>
-                    <div className="col-span-6 min-w-0">
+                  <div key={tc.id} className={`px-5 py-3 grid grid-cols-[24px_60px_1fr_120px_140px_80px] gap-3 items-center transition-colors ${selectedIds.has(tc.id) ? 'bg-brand-50/60' : 'hover:bg-surface-50'}`}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(tc.id)}
+                      onChange={() => toggleSelect(tc.id)}
+                      aria-label={`Select test case ${tc.id}`}
+                    />
+                    <div className="text-xs font-mono text-surface-500">TC-{tc.id}</div>
+                    <div className="min-w-0">
                       <button onClick={() => openEdit(tc)} className="text-left w-full">
-                        <div className="text-sm font-medium text-surface-900 truncate">{tc.title}</div>
+                        <div className="text-sm font-medium text-surface-900 truncate flex items-center gap-2">
+                          {tc.title}
+                          {tc.jiraIssueKey && <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 font-normal">{tc.jiraIssueKey}</span>}
+                        </div>
                         <div className="text-xs text-surface-500 truncate">{tc.content}</div>
                       </button>
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       <span className={`badge ${PRIORITY_STYLES[tc.priority]} capitalize`}>{tc.priority}</span>
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       <select
                         value={tc.folderId ?? ''}
                         onChange={(e) => handleMoveTestCase(tc, e.target.value ? parseInt(e.target.value, 10) : null)}
@@ -514,7 +604,7 @@ export default function ProjectTestCasesPage() {
                         {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                       </select>
                     </div>
-                    <div className="col-span-1 flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-1">
                       <button onClick={() => openEdit(tc)} className="icon-btn" aria-label="Edit"><Pencil size={13} /></button>
                       <button onClick={() => handleDeleteTestCase(tc.id)} className="icon-btn hover:text-red-500" aria-label="Delete"><Trash2 size={13} /></button>
                     </div>
@@ -578,6 +668,21 @@ export default function ProjectTestCasesPage() {
                   ))}
                 </div>
               </div>
+              <div>
+                <label className="label flex items-center gap-1"><LinkIcon size={12}/> Jira issue / story key</label>
+                <div className="flex gap-2">
+                  <input
+                    value={jiraKey}
+                    onChange={(e) => setJiraKey(e.target.value)}
+                    placeholder="e.g. PROJ-1234"
+                    className="input flex-1 font-mono text-sm"
+                  />
+                  <button type="button" onClick={handleLinkJira} className="btn-secondary btn-sm">
+                    {jiraKey.trim() ? 'Link' : 'Unlink'}
+                  </button>
+                </div>
+                <p className="text-xs text-surface-500 mt-1">Use a story key (e.g. PROJ-100) to link this test case to a user story, or an issue key for a bug.</p>
+              </div>
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => setEditingTc(null)} className="btn-secondary">Cancel</button>
                 <button type="submit" disabled={saving} className="btn-primary">
@@ -585,6 +690,54 @@ export default function ProjectTestCasesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add to Test Run modal */}
+      {showAddToRun && (
+        <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowAddToRun(false)}>
+          <div className="bg-white rounded-xl shadow-soft-lg w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-surface-200/70">
+              <h3 className="font-semibold text-surface-900">Add {selectedIds.size} test case{selectedIds.size === 1 ? '' : 's'} to a run</h3>
+              <button onClick={() => setShowAddToRun(false)} className="icon-btn"><X size={16}/></button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {testRuns.length === 0 ? (
+                <div className="p-6 text-center text-sm text-surface-500">
+                  No test runs yet.{' '}
+                  <button
+                    onClick={() => { setShowAddToRun(false); navigate(`/projects/${projectId}/test-runs/new?caseIds=${Array.from(selectedIds).join(',')}`); }}
+                    className="text-brand-600 hover:underline"
+                  >Create one</button>.
+                </div>
+              ) : (
+                <ul className="divide-y divide-surface-200/70">
+                  {testRuns.map((r) => (
+                    <li key={r.id}>
+                      <button
+                        onClick={() => doAddToRun(r.id)}
+                        disabled={addToRunBusy}
+                        className="w-full text-left px-4 py-3 hover:bg-surface-50 flex items-center gap-3"
+                      >
+                        <PlayCircle size={16} className="text-brand-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-surface-900 truncate">{r.name}</div>
+                          <div className="text-xs text-surface-500 capitalize">{String(r.state || '').replace('_',' ')} · {(r.testCaseIds || []).length} existing</div>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-surface-200/70 flex justify-between">
+              <button
+                onClick={() => { setShowAddToRun(false); navigate(`/projects/${projectId}/test-runs/new?caseIds=${Array.from(selectedIds).join(',')}`); }}
+                className="btn-secondary btn-sm"
+              ><Plus size={14}/> New run</button>
+              <button onClick={() => setShowAddToRun(false)} className="btn-secondary btn-sm">Cancel</button>
+            </div>
           </div>
         </div>
       )}

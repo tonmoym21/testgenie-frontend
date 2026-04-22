@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { ChevronRight, Paperclip, X, Search, Plus } from 'lucide-react';
 
@@ -14,6 +14,7 @@ function todayLabel() {
 export default function CreateTestRunPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [name, setName] = useState(`Test Run-${todayLabel()}`);
   const [description, setDescription] = useState('');
@@ -27,7 +28,11 @@ export default function CreateTestRunPage() {
   const [tags, setTags] = useState([]);
 
   const [allCases, setAllCases] = useState([]);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedIds, setSelectedIds] = useState(() => {
+    const s = searchParams.get('caseIds');
+    if (!s) return [];
+    return s.split(',').map((x) => parseInt(x, 10)).filter(Boolean);
+  });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState('');
   const [loadingCases, setLoadingCases] = useState(false);
@@ -106,7 +111,7 @@ export default function CreateTestRunPage() {
         autoAssign,
       };
       const created = await api.createTestRun(projectId, payload);
-      navigate(`/test-runs`);
+      navigate(`/projects/${projectId}/test-runs/${created.id}`);
     } catch (e) {
       setError(e?.message || 'Failed to create test run');
     } finally {

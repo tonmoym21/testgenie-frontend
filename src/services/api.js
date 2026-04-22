@@ -254,6 +254,11 @@ class ApiService {
   async createTestRun(projectId, data) { return this.request('POST', `/projects/${projectId}/test-runs`, data); }
   async updateTestRun(projectId, id, data) { return this.request('PATCH', `/projects/${projectId}/test-runs/${id}`, data); }
   async deleteTestRun(projectId, id) { return this.request('DELETE', `/projects/${projectId}/test-runs/${id}`); }
+  async getTestRunCases(projectId, id) { return this.request('GET', `/projects/${projectId}/test-runs/${id}/cases`); }
+  async addTestRunCases(projectId, id, testCaseIds) { return this.request('POST', `/projects/${projectId}/test-runs/${id}/cases`, { testCaseIds }); }
+  async removeTestRunCase(projectId, id, caseId) { return this.request('DELETE', `/projects/${projectId}/test-runs/${id}/cases/${caseId}`); }
+  async setTestRunResult(projectId, id, caseId, data) { return this.request('PATCH', `/projects/${projectId}/test-runs/${id}/cases/${caseId}/result`, data); }
+  async getTestRunStats(projectId, id) { return this.request('GET', `/projects/${projectId}/test-runs/${id}/stats`); }
 
   // ── Test Cases ────────────────────────────────────────────────────────────
   async getTestCases(projectId, params = {}) { const q = new URLSearchParams(params).toString(); return this.request('GET', `/projects/${projectId}/testcases${q ? '?' + q : ''}`); }

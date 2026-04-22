@@ -32,6 +32,7 @@ import IntegrationsPage from './pages/IntegrationsPage';
 import TestCasesRedirect from './pages/TestCasesRedirect';
 import TestRunsPage from './pages/TestRunsPage';
 import CreateTestRunPage from './pages/CreateTestRunPage';
+import TestRunDetailPage from './pages/TestRunDetailPage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -78,6 +79,8 @@ export default function App() {
       {/* Test Runs */}
       <Route path="/test-runs" element={<ProtectedRoute><TestRunsPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/test-runs/new" element={<ProtectedRoute><CreateTestRunPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/test-runs/:runId" element={<ProtectedRoute><TestRunDetailPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/test-runs" element={<ProtectedRoute><TestRunsPage /></ProtectedRoute>} />
       <Route path="/executions" element={<ProtectedRoute><ExecutionsPage /></ProtectedRoute>} />
       <Route path="/executions/:executionId" element={<ProtectedRoute><ExecutionDetailPage /></ProtectedRoute>} />
 
