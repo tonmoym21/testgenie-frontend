@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import {
   ChevronRight, ChevronDown, Plus, Loader2, X, CheckCircle2, XCircle, Circle,
   MinusCircle, SkipForward, RotateCcw, Trash2, Search, Folder, FolderOpen,
-  User, Clock, Edit2,
+  User, Clock, Edit2, MoreVertical, MessageSquarePlus, ChevronLeft,
+  ArrowUpDown, FileText, ExternalLink, Copy,
 } from 'lucide-react';
 
 const STATUS_META = {
@@ -16,6 +17,8 @@ const STATUS_META = {
   retest:   { label: 'Retest',   color: '#8b5cf6', bg: 'bg-violet-50',  text: 'text-violet-700',  icon: RotateCcw },
 };
 
+const EXECUTED_STATUSES = new Set(['passed', 'failed', 'blocked', 'skipped', 'retest']);
+
 function StatusPill({ status }) {
   const meta = STATUS_META[status] || STATUS_META.untested;
   const Icon = meta.icon;
@@ -26,11 +29,6 @@ function StatusPill({ status }) {
   );
 }
 
-/** Parse test case markdown content into structured sections.
- *  Recognized:
- *    ## Description / ## Preconditions (free text)
- *    ## Steps — numbered steps with optional "   → Expected: ..." line
- */
 function parseCaseContent(content) {
   if (!content || typeof content !== 'string') return { description: '', preconditions: '', steps: [] };
   const lines = content.split(/\r?\n/);
@@ -105,6 +103,18 @@ function ProgressBar({ progress, byStatus, total }) {
       </div>
     </div>
   );
+}
+
+function useClickOutside(onClose) {
+  const ref = useRef(null);
+  useEffect(() => {
+    function handler(e) {
+      if (ref.current && !ref.current.contains(e.target)) onClose();
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+  return ref;
 }
 
 function AddCasesModal({ projectId, existingIds, onClose, onAdded }) {
@@ -194,8 +204,94 @@ function AddCasesModal({ projectId, existingIds, onClose, onAdded }) {
   );
 }
 
+function EditRunModal({ run, onClose, onSave }) {
+  const [name, setName] = useState(run?.name || '');
+  const [description, setDescription] = useState(run?.description || '');
+  const [saving, setSaving] = useState(false);
+  const handleSave = async () => {
+    setSaving(true);
+    try { await onSave({ name, description }); onClose(); }
+    finally { setSaving(false); }
+  };
+  return (
+    <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-soft-lg w-full max-w-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200/70">
+          <h2 className="text-lg font-semibold text-surface-900">Edit test run</h2>
+          <button onClick={onClose} className="icon-btn"><X size={18} /></button>
+        </div>
+        <div className="px-6 py-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-surface-700 mb-1">Name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="input text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-surface-700 mb-1">Description</label>
+            <textarea value={description || ''} onChange={(e) => setDescription(e.target.value)} rows={4} className="input text-sm" />
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-surface-200/70">
+          <button onClick={onClose} className="btn-secondary">Cancel</button>
+          <button onClick={handleSave} disabled={saving || !name.trim()} className="btn-primary">
+            {saving && <Loader2 size={14} className="animate-spin" />} Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExecutionLogModal({ projectId, runId, onClose }) {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.getTestRunExecutionLog(projectId, runId);
+        setEntries(res.data || []);
+      } catch (err) { setError(err.message); }
+      finally { setLoading(false); }
+    })();
+  }, [projectId, runId]);
+  return (
+    <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-soft-lg w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200/70">
+          <h2 className="text-lg font-semibold text-surface-900">Execution log</h2>
+          <button onClick={onClose} className="icon-btn"><X size={18} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="p-6 text-center text-surface-500"><Loader2 className="inline animate-spin mr-2" size={14}/>Loading…</div>
+          ) : error ? (
+            <div className="p-6 text-sm text-red-600">{error}</div>
+          ) : entries.length === 0 ? (
+            <div className="p-6 text-center text-sm text-surface-500">No step executions recorded yet.</div>
+          ) : (
+            <ul className="divide-y divide-surface-200/70">
+              {entries.map((e, i) => (
+                <li key={i} className="px-6 py-3 text-sm">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs text-surface-500">TC-{e.caseId}</span>
+                    <span className="text-surface-800 truncate">{e.caseTitle}</span>
+                    <span className="text-xs text-surface-500">Step {e.stepIndex + 1}</span>
+                    <StatusPill status={e.status} />
+                    {e.updatedAt && <span className="ml-auto text-xs text-surface-500">{new Date(e.updatedAt).toLocaleString()}</span>}
+                  </div>
+                  {e.note && <div className="mt-1 text-xs text-surface-600 italic">"{e.note}"</div>}
+                  {e.updatedBy && <div className="mt-0.5 text-[11px] text-surface-500">by {e.updatedBy}</div>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FolderTree({ folders, cases, selectedFolderId, onSelect }) {
-  // Build tree: map of parent -> children; include counts.
   const byId = new Map(folders.map((f) => [f.id, { ...f, children: [] }]));
   const roots = [];
   for (const f of byId.values()) {
@@ -206,7 +302,10 @@ function FolderTree({ folders, cases, selectedFolderId, onSelect }) {
     const m = new Map();
     for (const c of cases) {
       const k = c.folderId || 0;
-      m.set(k, (m.get(k) || 0) + 1);
+      const entry = m.get(k) || { total: 0, executed: 0 };
+      entry.total += 1;
+      if (EXECUTED_STATUSES.has(c.status)) entry.executed += 1;
+      m.set(k, entry);
     }
     return m;
   }, [cases]);
@@ -216,8 +315,12 @@ function FolderTree({ folders, cases, selectedFolderId, onSelect }) {
     const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
   });
 
+  function CountLabel({ id }) {
+    const entry = countsByFolder.get(id) || { total: 0, executed: 0 };
+    return <span className="text-xs text-surface-500 tabular-nums shrink-0">{entry.executed}({entry.total})</span>;
+  }
+
   function FolderNode({ node, depth }) {
-    const count = countsByFolder.get(node.id) || 0;
     const isOpen = expanded.has(node.id);
     const hasKids = node.children.length > 0;
     const active = selectedFolderId === node.id;
@@ -236,7 +339,7 @@ function FolderTree({ folders, cases, selectedFolderId, onSelect }) {
           </button>
           {isOpen && hasKids ? <FolderOpen size={14} className="text-amber-500 shrink-0" /> : <Folder size={14} className="text-amber-500 shrink-0" />}
           <span className="truncate flex-1">{node.name}</span>
-          <span className="text-xs text-surface-500 tabular-nums shrink-0">{count}</span>
+          <CountLabel id={node.id} />
         </div>
         {isOpen && hasKids && (
           <div>
@@ -247,8 +350,9 @@ function FolderTree({ folders, cases, selectedFolderId, onSelect }) {
     );
   }
 
-  const allCount = cases.length;
-  const uncategorizedCount = countsByFolder.get(0) || 0;
+  const allTotal = cases.length;
+  const allExecuted = cases.filter((c) => EXECUTED_STATUSES.has(c.status)).length;
+  const uncat = countsByFolder.get(0);
 
   return (
     <div className="p-2">
@@ -258,44 +362,156 @@ function FolderTree({ folders, cases, selectedFolderId, onSelect }) {
       >
         <Folder size={14} className="text-brand-500" />
         <span className="font-medium flex-1">All Test Cases</span>
-        <span className="text-xs text-surface-500 tabular-nums">{allCount}</span>
+        <span className="text-xs text-surface-500 tabular-nums">{allExecuted}({allTotal})</span>
       </div>
       {roots.map((r) => <FolderNode key={r.id} node={r} depth={0} />)}
-      {uncategorizedCount > 0 && (
+      {uncat && uncat.total > 0 && (
         <div
           className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-sm cursor-pointer mt-1 ${selectedFolderId === 'uncategorized' ? 'bg-brand-50 text-brand-700' : 'hover:bg-surface-50 text-surface-700'}`}
           onClick={() => onSelect('uncategorized')}
         >
           <Folder size={14} className="text-surface-400" />
           <span className="flex-1 italic">Uncategorized</span>
-          <span className="text-xs text-surface-500 tabular-nums">{uncategorizedCount}</span>
+          <span className="text-xs text-surface-500 tabular-nums">{uncat.executed}({uncat.total})</span>
         </div>
       )}
     </div>
   );
 }
 
-function StepActionButtons({ currentStatus, onSet, disabled }) {
+function StepActionButtons({ currentStatus, onSet, disabled, onAddNote }) {
   return (
-    <div className="inline-flex items-center rounded-md border border-surface-200 overflow-hidden divide-x divide-surface-200">
-      {[
-        { k: 'passed', label: 'Pass', cls: 'text-emerald-700 hover:bg-emerald-50', activeCls: 'bg-emerald-50 text-emerald-700' },
-        { k: 'failed', label: 'Fail', cls: 'text-red-700 hover:bg-red-50', activeCls: 'bg-red-50 text-red-700' },
-        { k: 'skipped', label: 'Skip', cls: 'text-amber-700 hover:bg-amber-50', activeCls: 'bg-amber-50 text-amber-700' },
-      ].map((b) => {
-        const active = currentStatus === b.k;
-        const Icon = STATUS_META[b.k].icon;
-        return (
-          <button
-            key={b.k}
-            disabled={disabled}
-            onClick={() => onSet(b.k)}
-            className={`px-2.5 py-1 text-xs font-medium inline-flex items-center gap-1 ${active ? b.activeCls : b.cls} disabled:opacity-50`}
-          >
-            <Icon size={11} /> {b.label}
+    <div className="inline-flex items-center gap-1">
+      <div className="inline-flex items-center rounded-md border border-surface-200 overflow-hidden divide-x divide-surface-200">
+        {[
+          { k: 'passed', label: 'Pass', cls: 'text-emerald-700 hover:bg-emerald-50', activeCls: 'bg-emerald-50 text-emerald-700' },
+          { k: 'failed', label: 'Fail', cls: 'text-red-700 hover:bg-red-50', activeCls: 'bg-red-50 text-red-700' },
+          { k: 'skipped', label: 'Skip', cls: 'text-amber-700 hover:bg-amber-50', activeCls: 'bg-amber-50 text-amber-700' },
+        ].map((b) => {
+          const active = currentStatus === b.k;
+          const Icon = STATUS_META[b.k].icon;
+          return (
+            <button
+              key={b.k}
+              disabled={disabled}
+              onClick={() => onSet(b.k)}
+              className={`px-2.5 py-1 text-xs font-medium inline-flex items-center gap-1 ${active ? b.activeCls : b.cls} disabled:opacity-50`}
+            >
+              <Icon size={11} /> {b.label}
+            </button>
+          );
+        })}
+      </div>
+      <button
+        onClick={onAddNote}
+        className="px-2 py-1 text-xs font-medium inline-flex items-center gap-1 rounded-md border border-surface-200 text-surface-600 hover:bg-surface-50"
+      >
+        <MessageSquarePlus size={11} /> Add notes
+      </button>
+    </div>
+  );
+}
+
+function CaseRowMenu({ caseItem, onMark, onReset, onEdit, onRemove, onCopyId }) {
+  const [open, setOpen] = useState(false);
+  const ref = useClickOutside(() => setOpen(false));
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        className="icon-btn p-1"
+        title="More"
+      >
+        <MoreVertical size={14} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-surface-200 rounded-md shadow-soft-lg min-w-[180px] py-1 text-sm">
+          {['passed','failed','blocked','skipped','retest'].map((k) => (
+            <button
+              key={k}
+              onClick={(e) => { e.stopPropagation(); setOpen(false); onMark(k); }}
+              className="w-full text-left px-3 py-1.5 hover:bg-surface-50 flex items-center gap-2"
+            >
+              {(() => { const I = STATUS_META[k].icon; return <I size={12} style={{ color: STATUS_META[k].color }} />; })()}
+              Mark as {STATUS_META[k].label}
+            </button>
+          ))}
+          <div className="my-1 border-t border-surface-200/70" />
+          <button onClick={(e) => { e.stopPropagation(); setOpen(false); onReset(); }} className="w-full text-left px-3 py-1.5 hover:bg-surface-50 flex items-center gap-2">
+            <RotateCcw size={12} /> Reset to Untested
           </button>
-        );
-      })}
+          <button onClick={(e) => { e.stopPropagation(); setOpen(false); onEdit(); }} className="w-full text-left px-3 py-1.5 hover:bg-surface-50 flex items-center gap-2">
+            <Edit2 size={12} /> Edit test case
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); setOpen(false); onCopyId(); }} className="w-full text-left px-3 py-1.5 hover:bg-surface-50 flex items-center gap-2">
+            <Copy size={12} /> Copy case ID
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); setOpen(false); onRemove(); }} className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600 flex items-center gap-2">
+            <Trash2 size={12} /> Remove from run
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RunHeaderMenu({ onEditRun, onSetState, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const ref = useClickOutside(() => setOpen(false));
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen((v) => !v)} className="icon-btn" title="More actions">
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-surface-200 rounded-md shadow-soft-lg min-w-[200px] py-1 text-sm">
+          <button onClick={() => { setOpen(false); onEditRun(); }} className="w-full text-left px-3 py-1.5 hover:bg-surface-50 flex items-center gap-2">
+            <Edit2 size={12} /> Edit run
+          </button>
+          <div className="my-1 border-t border-surface-200/70" />
+          <button onClick={() => { setOpen(false); onSetState('in_progress'); }} className="w-full text-left px-3 py-1.5 hover:bg-surface-50">Mark run as In Progress</button>
+          <button onClick={() => { setOpen(false); onSetState('completed'); }} className="w-full text-left px-3 py-1.5 hover:bg-surface-50">Mark run as Completed</button>
+          <button onClick={() => { setOpen(false); onSetState('closed'); }} className="w-full text-left px-3 py-1.5 hover:bg-surface-50">Mark run as Closed</button>
+          <div className="my-1 border-t border-surface-200/70" />
+          <button onClick={() => { setOpen(false); onDelete(); }} className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600 flex items-center gap-2">
+            <Trash2 size={12} /> Delete run
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SortDropdown({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useClickOutside(() => setOpen(false));
+  const options = [
+    { k: 'custom', label: 'Custom' },
+    { k: 'name_asc', label: 'Name (A-Z)' },
+    { k: 'name_desc', label: 'Name (Z-A)' },
+    { k: 'id_asc', label: 'ID ascending' },
+    { k: 'id_desc', label: 'ID descending' },
+  ];
+  const current = options.find((o) => o.k === value) || options[0];
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen((v) => !v)} className="inline-flex items-center gap-1 text-xs text-surface-600 hover:text-surface-900 px-2 py-1 rounded-md hover:bg-surface-50">
+        <ArrowUpDown size={12} /> Sort by: {current.label}
+        <ChevronDown size={12} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-surface-200 rounded-md shadow-soft-lg min-w-[160px] py-1 text-sm">
+          {options.map((o) => (
+            <button
+              key={o.k}
+              onClick={() => { onChange(o.k); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 hover:bg-surface-50 ${value === o.k ? 'text-brand-700 font-medium' : ''}`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -310,9 +526,14 @@ export default function TestRunDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [showEditRun, setShowEditRun] = useState(false);
+  const [showExecLog, setShowExecLog] = useState(false);
   const [busy, setBusy] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState('all');
   const [selectedCaseId, setSelectedCaseId] = useState(null);
+  const [sortBy, setSortBy] = useState('custom');
+  const [openNotes, setOpenNotes] = useState({});
+  const [noteDrafts, setNoteDrafts] = useState({});
 
   const reload = useCallback(async () => {
     try {
@@ -326,7 +547,6 @@ export default function TestRunDetailPage() {
       setCases(c.data || []);
       setStats(s);
       setFolders((f?.data || f || []).map((x) => ({ ...x, parentId: x.parentId ?? x.parent_id })));
-      // default selection
       if (!selectedCaseId && (c.data || []).length > 0) setSelectedCaseId((c.data || [])[0].id);
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
@@ -334,11 +554,23 @@ export default function TestRunDetailPage() {
 
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, [projectId, runId]);
 
-  const visibleCases = useMemo(() => {
+  const folderFiltered = useMemo(() => {
     if (selectedFolder === 'all') return cases;
     if (selectedFolder === 'uncategorized') return cases.filter((c) => !c.folderId);
     return cases.filter((c) => c.folderId === selectedFolder);
   }, [cases, selectedFolder]);
+
+  const visibleCases = useMemo(() => {
+    const arr = [...folderFiltered];
+    switch (sortBy) {
+      case 'name_asc': arr.sort((a, b) => (a.title || '').localeCompare(b.title || '')); break;
+      case 'name_desc': arr.sort((a, b) => (b.title || '').localeCompare(a.title || '')); break;
+      case 'id_asc': arr.sort((a, b) => a.id - b.id); break;
+      case 'id_desc': arr.sort((a, b) => b.id - a.id); break;
+      default: break;
+    }
+    return arr;
+  }, [folderFiltered, sortBy]);
 
   const selectedCase = useMemo(
     () => cases.find((c) => c.id === selectedCaseId) || visibleCases[0] || null,
@@ -346,6 +578,11 @@ export default function TestRunDetailPage() {
   );
 
   const parsed = useMemo(() => parseCaseContent(selectedCase?.content), [selectedCase]);
+
+  const currentVisibleIndex = useMemo(() => {
+    if (!selectedCase) return -1;
+    return visibleCases.findIndex((c) => c.id === selectedCase.id);
+  }, [visibleCases, selectedCase]);
 
   const setCaseResult = async (caseId, status) => {
     setBusy(true);
@@ -356,10 +593,26 @@ export default function TestRunDetailPage() {
     finally { setBusy(false); }
   };
 
+  const resetCase = async (caseId) => {
+    setBusy(true);
+    try { await api.resetTestRunCase(projectId, runId, caseId); await reload(); }
+    catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  };
+
   const setStepResult = async (caseId, stepIndex, status) => {
     setBusy(true);
     try {
       await api.setTestRunStepResult(projectId, runId, caseId, stepIndex, { status });
+      await reload();
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  };
+
+  const saveStepNote = async (caseId, stepIndex, note) => {
+    setBusy(true);
+    try {
+      await api.setTestRunStepNote(projectId, runId, caseId, stepIndex, { note });
       await reload();
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
@@ -376,14 +629,47 @@ export default function TestRunDetailPage() {
     await reload();
   };
 
+  const copyCaseId = (caseId) => {
+    try {
+      navigator.clipboard?.writeText(`TC-${caseId}`);
+    } catch { /* ignore */ }
+  };
+
+  const handleUpdateRun = async (patch) => {
+    const updated = await api.updateTestRun(projectId, runId, patch);
+    setRun(updated);
+  };
+
+  const handleSetRunState = async (state) => {
+    try { await handleUpdateRun({ state }); await reload(); }
+    catch (err) { setError(err.message); }
+  };
+
+  const handleDeleteRun = async () => {
+    if (!confirm('Delete this test run? This cannot be undone.')) return;
+    try {
+      await api.deleteTestRun(projectId, runId);
+      navigate(`/projects/${projectId}/test-runs`);
+    } catch (err) { setError(err.message); }
+  };
+
+  const goToAdjacent = (delta) => {
+    const nextIdx = currentVisibleIndex + delta;
+    if (nextIdx < 0 || nextIdx >= visibleCases.length) return;
+    setSelectedCaseId(visibleCases[nextIdx].id);
+  };
+
   if (loading) {
     return <div className="p-6 text-surface-500"><Loader2 className="inline animate-spin mr-2" size={14}/>Loading test run…</div>;
   }
 
-  const runStatus = run?.state === 'completed' || run?.state === 'closed' ? 'passed' : 'untested';
   const runStatusLabel = run?.state === 'completed' ? 'Completed'
     : run?.state === 'closed' ? 'Closed'
     : run?.state === 'in_progress' ? 'In Progress' : 'New';
+
+  const jiraUrl = selectedCase?.jiraIssueUrl || (selectedCase?.jiraIssueKey && run?.jiraBaseUrl
+    ? `${run.jiraBaseUrl.replace(/\/+$/, '')}/browse/${selectedCase.jiraIssueKey}`
+    : null);
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-surface-50">
@@ -397,6 +683,9 @@ export default function TestRunDetailPage() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-semibold text-surface-900 truncate">{run?.name}</h1>
+            {run?.description && (
+              <p className="mt-1 text-sm text-surface-600 whitespace-pre-line">{run.description}</p>
+            )}
             <div className="mt-2 flex items-center gap-4 text-sm text-surface-600 flex-wrap">
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                 run?.state === 'completed' || run?.state === 'closed' ? 'bg-emerald-50 text-emerald-700'
@@ -406,15 +695,23 @@ export default function TestRunDetailPage() {
                 <CheckCircle2 size={12} /> {runStatusLabel}
               </span>
               {(run?.assigneeName || run?.assigneeEmail) && (
-                <span className="inline-flex items-center gap-1"><User size={13} /> {run.assigneeName || run.assigneeEmail}</span>
+                <span className="inline-flex items-center gap-1" title={run.assigneeEmail || ''}><User size={13} /> {run.assigneeName || run.assigneeEmail}</span>
               )}
               {run?.createdAt && (
                 <span className="inline-flex items-center gap-1"><Clock size={13} /> {new Date(run.createdAt).toLocaleString()}</span>
               )}
+              <button onClick={() => setShowExecLog(true)} className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-700 hover:underline">
+                <FileText size={13} /> View execution log
+              </button>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowAdd(true)} className="btn-secondary btn-sm"><Plus size={14} /> Add Cases</button>
+            <RunHeaderMenu
+              onEditRun={() => setShowEditRun(true)}
+              onSetState={handleSetRunState}
+              onDelete={handleDeleteRun}
+            />
           </div>
         </div>
         <div className="mt-4">
@@ -430,10 +727,13 @@ export default function TestRunDetailPage() {
       )}
 
       {/* Three-column layout */}
-      <div className="grid grid-cols-[240px_minmax(0,1fr)_420px] gap-0 h-[calc(100vh-200px)]">
+      <div className="grid grid-cols-[240px_minmax(0,1fr)_440px] gap-0 h-[calc(100vh-200px)]">
         {/* Left — folder tree */}
-        <aside className="bg-white border-r border-surface-200/70 overflow-y-auto">
-          <div className="px-3 py-2 border-b border-surface-200/70 text-xs font-semibold uppercase tracking-wider text-surface-500">All Test Cases</div>
+        <aside className="bg-white border-r border-surface-200/70 overflow-y-auto flex flex-col">
+          <div className="px-3 py-2 border-b border-surface-200/70 flex items-center justify-between">
+            <div className="text-xs font-semibold uppercase tracking-wider text-surface-500">All Test Cases</div>
+            <SortDropdown value={sortBy} onChange={setSortBy} />
+          </div>
           <FolderTree folders={folders} cases={cases} selectedFolderId={selectedFolder} onSelect={setSelectedFolder} />
         </aside>
 
@@ -452,22 +752,33 @@ export default function TestRunDetailPage() {
             </div>
           ) : (
             <ul>
-              <li className="px-4 py-2 border-b border-surface-200/70 bg-surface-50 text-[11px] font-semibold uppercase tracking-wider text-surface-500 grid grid-cols-[32px_70px_1fr_80px] gap-2 items-center">
+              <li className="px-4 py-2 border-b border-surface-200/70 bg-surface-50 text-[11px] font-semibold uppercase tracking-wider text-surface-500 grid grid-cols-[32px_70px_1fr_90px_32px] gap-2 items-center">
                 <div />
                 <div>ID</div>
                 <div>Title</div>
                 <div className="text-right">Status</div>
+                <div />
               </li>
               {visibleCases.map((c) => (
                 <li
                   key={c.id}
                   onClick={() => setSelectedCaseId(c.id)}
-                  className={`px-4 py-2.5 grid grid-cols-[32px_70px_1fr_80px] gap-2 items-center cursor-pointer border-b border-surface-100 text-sm ${selectedCaseId === c.id ? 'bg-brand-50/60' : 'hover:bg-surface-50'}`}
+                  className={`px-4 py-2.5 grid grid-cols-[32px_70px_1fr_90px_32px] gap-2 items-center cursor-pointer border-b border-surface-100 text-sm ${selectedCaseId === c.id ? 'bg-brand-50/60' : 'hover:bg-surface-50'}`}
                 >
                   <input type="checkbox" onClick={(e) => e.stopPropagation()} />
                   <span className="font-mono text-xs text-surface-500">TC-{c.id}</span>
                   <span className="truncate text-surface-800">{c.title}</span>
                   <div className="flex justify-end"><StatusPill status={c.status} /></div>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <CaseRowMenu
+                      caseItem={c}
+                      onMark={(status) => setCaseResult(c.id, status)}
+                      onReset={() => resetCase(c.id)}
+                      onEdit={() => navigate(`/projects/${projectId}/test-cases?edit=${c.id}`)}
+                      onRemove={() => removeCase(c.id)}
+                      onCopyId={() => copyCaseId(c.id)}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -475,7 +786,7 @@ export default function TestRunDetailPage() {
         </section>
 
         {/* Right — details panel */}
-        <aside className="bg-white overflow-y-auto">
+        <aside className="bg-white overflow-y-auto flex flex-col">
           {!selectedCase ? (
             <div className="p-8 text-center text-sm text-surface-500">Select a test case to see details.</div>
           ) : (
@@ -488,13 +799,34 @@ export default function TestRunDetailPage() {
                 </div>
               </div>
 
-              <div className="px-5 py-4">
+              <div className="flex-1 overflow-y-auto px-5 py-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-xs font-mono text-surface-500">TC-{selectedCase.id}</div>
                     <h2 className="text-base font-semibold text-surface-900 mt-0.5">{selectedCase.title}</h2>
                   </div>
                   <StatusPill status={selectedCase.status} />
+                </div>
+
+                {/* Meta: assignee, created, priority */}
+                <div className="mt-3 flex items-center gap-3 flex-wrap text-xs text-surface-500">
+                  {selectedCase.executedByName || selectedCase.executedByEmail ? (
+                    <span
+                      className="inline-flex items-center gap-1"
+                      title={`Executed by ${selectedCase.executedByName || ''} ${selectedCase.executedByEmail ? `(${selectedCase.executedByEmail})` : ''}`.trim()}
+                    >
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-100 text-brand-700 text-[10px] font-semibold">
+                        {((selectedCase.executedByName || selectedCase.executedByEmail || '?').trim().charAt(0) || '?').toUpperCase()}
+                      </span>
+                      {selectedCase.executedByName || selectedCase.executedByEmail}
+                    </span>
+                  ) : null}
+                  {selectedCase.executedAt && (
+                    <span className="inline-flex items-center gap-1"><Clock size={11}/> {new Date(selectedCase.executedAt).toLocaleString()}</span>
+                  )}
+                  {selectedCase.priority && (
+                    <span className="capitalize px-1.5 py-0.5 rounded bg-surface-100">{selectedCase.priority}</span>
+                  )}
                 </div>
 
                 {/* Per-case quick actions */}
@@ -514,9 +846,15 @@ export default function TestRunDetailPage() {
                       </button>
                     );
                   })}
+                  <button
+                    disabled={busy}
+                    onClick={() => resetCase(selectedCase.id)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border bg-white text-surface-600 border-surface-200 hover:bg-surface-50 disabled:opacity-50"
+                  >
+                    <RotateCcw size={10} /> Reset
+                  </button>
                 </div>
 
-                {/* Description */}
                 {parsed.description && (
                   <div className="mt-5">
                     <div className="text-xs font-semibold text-surface-700 mb-1">Description</div>
@@ -524,7 +862,6 @@ export default function TestRunDetailPage() {
                   </div>
                 )}
 
-                {/* Preconditions */}
                 {parsed.preconditions && (
                   <div className="mt-4">
                     <div className="text-xs font-semibold text-surface-700 mb-1">Preconditions</div>
@@ -532,7 +869,6 @@ export default function TestRunDetailPage() {
                   </div>
                 )}
 
-                {/* Steps & Results */}
                 <div className="mt-5">
                   <div className="text-xs font-semibold text-surface-700 mb-2">All Steps & Results:</div>
                   {parsed.steps.length === 0 ? (
@@ -542,6 +878,10 @@ export default function TestRunDetailPage() {
                       {parsed.steps.map((step, idx) => {
                         const stepRes = Array.isArray(selectedCase.stepResults) ? selectedCase.stepResults[idx] : null;
                         const stepStatus = stepRes?.status || 'untested';
+                        const existingNote = stepRes?.note || stepRes?.notes || '';
+                        const noteKey = `${selectedCase.id}:${idx}`;
+                        const isNoteOpen = !!openNotes[noteKey];
+                        const draft = noteDrafts[noteKey] !== undefined ? noteDrafts[noteKey] : existingNote;
                         return (
                           <li key={idx} className="border border-surface-200 rounded-lg p-3 bg-white">
                             <div className="flex items-center justify-between gap-2">
@@ -555,13 +895,51 @@ export default function TestRunDetailPage() {
                                 <div className="text-surface-700 whitespace-pre-line">{step.result}</div>
                               </div>
                             )}
+                            {existingNote && !isNoteOpen && (
+                              <div className="mt-2 text-xs text-surface-600 bg-surface-50 border border-surface-200 rounded px-2 py-1.5 italic">
+                                Note: {existingNote}
+                              </div>
+                            )}
                             <div className="mt-2">
                               <StepActionButtons
                                 currentStatus={stepStatus}
                                 disabled={busy}
                                 onSet={(s) => setStepResult(selectedCase.id, idx, s)}
+                                onAddNote={() => setOpenNotes((o) => ({ ...o, [noteKey]: !o[noteKey] }))}
                               />
                             </div>
+                            {isNoteOpen && (
+                              <div className="mt-2">
+                                <textarea
+                                  value={draft}
+                                  onChange={(e) => setNoteDrafts((d) => ({ ...d, [noteKey]: e.target.value }))}
+                                  rows={2}
+                                  placeholder="Add a note for this step"
+                                  className="input text-xs py-1.5"
+                                />
+                                <div className="mt-1 flex items-center gap-2 justify-end">
+                                  <button
+                                    onClick={() => {
+                                      setOpenNotes((o) => ({ ...o, [noteKey]: false }));
+                                      setNoteDrafts((d) => { const n = { ...d }; delete n[noteKey]; return n; });
+                                    }}
+                                    className="btn-secondary btn-sm"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    disabled={busy}
+                                    onClick={async () => {
+                                      await saveStepNote(selectedCase.id, idx, draft || '');
+                                      setOpenNotes((o) => ({ ...o, [noteKey]: false }));
+                                    }}
+                                    className="btn-primary btn-sm"
+                                  >
+                                    Save note
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </li>
                         );
                       })}
@@ -570,8 +948,37 @@ export default function TestRunDetailPage() {
                 </div>
 
                 {selectedCase.jiraIssueKey && (
-                  <div className="mt-5 text-xs text-brand-600">🔗 Linked to Jira: {selectedCase.jiraIssueKey}</div>
+                  <div className="mt-5 text-xs">
+                    {jiraUrl ? (
+                      <a href={jiraUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-700 hover:underline">
+                        <ExternalLink size={12} /> Linked to Jira: {selectedCase.jiraIssueKey}
+                      </a>
+                    ) : (
+                      <span className="text-brand-600">Linked to Jira: {selectedCase.jiraIssueKey}</span>
+                    )}
+                  </div>
                 )}
+              </div>
+
+              {/* Previous / Next navigation footer */}
+              <div className="border-t border-surface-200/70 px-5 py-2.5 flex items-center justify-between bg-surface-50">
+                <button
+                  onClick={() => goToAdjacent(-1)}
+                  disabled={currentVisibleIndex <= 0}
+                  className="btn-secondary btn-sm disabled:opacity-40"
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+                <div className="text-xs text-surface-500">
+                  {currentVisibleIndex >= 0 ? `${currentVisibleIndex + 1} of ${visibleCases.length}` : ''}
+                </div>
+                <button
+                  onClick={() => goToAdjacent(1)}
+                  disabled={currentVisibleIndex < 0 || currentVisibleIndex >= visibleCases.length - 1}
+                  className="btn-secondary btn-sm disabled:opacity-40"
+                >
+                  Next <ChevronRight size={14} />
+                </button>
               </div>
             </div>
           )}
@@ -585,6 +992,16 @@ export default function TestRunDetailPage() {
           onClose={() => setShowAdd(false)}
           onAdded={handleAdd}
         />
+      )}
+      {showEditRun && (
+        <EditRunModal
+          run={run}
+          onClose={() => setShowEditRun(false)}
+          onSave={handleUpdateRun}
+        />
+      )}
+      {showExecLog && (
+        <ExecutionLogModal projectId={projectId} runId={runId} onClose={() => setShowExecLog(false)} />
       )}
     </div>
   );
