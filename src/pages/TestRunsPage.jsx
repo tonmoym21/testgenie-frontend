@@ -4,8 +4,39 @@ import { api } from '../services/api';
 import { getCurrentProjectId } from '../utils/currentProject';
 import {
   Plus, Search, Filter, ChevronDown, CheckCircle2, XCircle, Loader2,
-  MoreHorizontal, Play, LayoutGrid, User, Sparkles,
+  MoreHorizontal, Play, LayoutGrid, User, Sparkles, Trash2, ExternalLink,
 } from 'lucide-react';
+
+function RunRowMenu({ onOpen, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((v) => !v); }}
+        className="icon-btn opacity-0 group-hover:opacity-100 transition-opacity"
+        aria-label="Run options"
+      >
+        <MoreHorizontal size={14} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-surface-200 rounded-md shadow-soft-lg min-w-[160px] py-1 text-sm">
+          <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); onOpen(); }} className="w-full text-left px-3 py-1.5 hover:bg-surface-50 flex items-center gap-2">
+            <ExternalLink size={12} /> Open
+          </button>
+          <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); onDelete(); }} className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600 flex items-center gap-2">
+            <Trash2 size={12} /> Delete run
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function formatDate(iso) {
   if (!iso) return '';
@@ -307,9 +338,16 @@ export default function TestRunsPage() {
                   <div className="text-sm text-surface-400">—</div>
 
                   <div className="flex justify-end">
-                    <button onClick={(e) => e.preventDefault()} className="icon-btn opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Run options">
-                      <MoreHorizontal size={14} />
-                    </button>
+                    <RunRowMenu
+                      onOpen={() => navigate(`/projects/${projectId}/test-runs/${r.id}`)}
+                      onDelete={async () => {
+                        if (!confirm(`Delete run "${r.name}"? This cannot be undone.`)) return;
+                        try {
+                          await api.deleteTestRun(projectId, r.id);
+                          setRuns((prev) => prev.filter((x) => x.id !== r.id));
+                        } catch (err) { setError(err.message); }
+                      }}
+                    />
                   </div>
                 </Link>
               );

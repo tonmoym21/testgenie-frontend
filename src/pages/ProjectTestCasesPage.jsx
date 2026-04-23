@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
 import {
   ArrowLeft, Plus, Loader2, Trash2, Pencil, X, Search, Folder, FolderOpen,
@@ -93,6 +93,7 @@ function FolderNode({ node, depth, expanded, toggle, selected, onSelect, countFo
 export default function ProjectTestCasesPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [project, setProject] = useState(null);
   const [folders, setFolders] = useState([]);
   const [testCases, setTestCases] = useState([]);
@@ -109,8 +110,15 @@ export default function ProjectTestCasesPage() {
   const [folderName, setFolderName] = useState('');
   const [folderSaving, setFolderSaving] = useState(false);
 
-  // Create TC modal
+  // Create / Edit TC modal (unified)
   const [showCreate, setShowCreate] = useState(false);
+  const [editingCase, setEditingCase] = useState(null);
+  // Team members for assignee rendering
+  const [members, setMembers] = useState([]);
+  // Copy/Move target-project picker
+  const [projectPicker, setProjectPicker] = useState(null); // { mode: 'copy' | 'move' }
+  const [projectsList, setProjectsList] = useState([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
   // Import TC modal
   const [showImport, setShowImport] = useState(false);
   // Selection + bulk "Add to Run"
@@ -154,6 +162,27 @@ export default function ProjectTestCasesPage() {
   }, [projectId]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Load team members once
+  useEffect(() => {
+    api.listAssignableMembers().then((r) => setMembers(r?.members || [])).catch(() => {});
+  }, []);
+
+  // Open edit modal when ?edit=<id> is in the URL
+  useEffect(() => {
+    const id = searchParams.get('edit');
+    if (!id || testCases.length === 0) return;
+    const tc = testCases.find((x) => String(x.id) === String(id));
+    if (tc) setEditingCase(tc);
+  }, [searchParams, testCases]);
+
+  const closeEditFromUrl = () => {
+    if (searchParams.get('edit')) {
+      const n = new URLSearchParams(searchParams);
+      n.delete('edit');
+      setSearchParams(n, { replace: true });
+    }
+  };
 
   const tree = useMemo(() => buildTree(folders), [folders]);
 
@@ -268,14 +297,107 @@ export default function ProjectTestCasesPage() {
       content: payload.content,
       priority: payload.priority,
       folderId: folderId || undefined,
+      assigneeUserId: payload.assigneeUserId || undefined,
     });
     setTestCases((prev) => [tc, ...prev]);
     if (!keepOpen) setShowCreate(false);
   };
 
   const openEdit = (tc) => {
-    setEditingTc(tc); setEditTitle(tc.title); setEditContent(tc.content); setEditPriority(tc.priority);
-    setJiraKey(tc.jiraIssueKey || '');
+    setEditingCase(tc);
+  };
+
+  // Submit handler used by the shared CreateTestCaseModal in edit mode.
+  const handleEditModalSubmit = async (payload) => {
+    const updated = await api.updateTestCase(projectId, editingCase.id, {
+      title: payload.title,
+      content: payload.content,
+      priority: payload.priority,
+      assigneeUserId: payload.assigneeUserId ?? null,
+    });
+    setTestCases((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    setEditingCase(null);
+    closeEditFromUrl();
+  };
+
+  // Bulk actions on selected cases
+  const bulkClone = async () => {
+    setBulkBusy(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const created = [];
+      for (const id of ids) {
+        const src = testCases.find((x) => x.id === id);
+        if (!src) continue;
+        const row = await api.createTestCase(projectId, {
+          title: `${src.title} (Copy)`,
+          content: src.content,
+          priority: src.priority,
+          folderId: src.folderId || undefined,
+          assigneeUserId: src.assigneeUserId || undefined,
+        });
+        created.push(row);
+      }
+      setTestCases((prev) => [...created, ...prev]);
+      clearSelection();
+    } catch (err) { setError(err.message); }
+    finally { setBulkBusy(false); }
+  };
+  const openProjectPicker = async (mode) => {
+    try {
+      const r = await api.getProjects();
+      setProjectsList(r?.data || r || []);
+      setProjectPicker({ mode });
+    } catch (err) { setError(err.message); }
+  };
+  const doCopyOrMove = async (targetProjectId) => {
+    setBulkBusy(true);
+    try {
+      const ids = Array.from(selectedIds);
+      for (const id of ids) {
+        const src = testCases.find((x) => x.id === id);
+        if (!src) continue;
+        await api.createTestCase(targetProjectId, {
+          title: src.title,
+          content: src.content,
+          priority: src.priority,
+        });
+      }
+      if (projectPicker?.mode === 'move') {
+        for (const id of ids) {
+          await api.deleteTestCase(projectId, id);
+        }
+        setTestCases((prev) => prev.filter((x) => !ids.includes(x.id)));
+      }
+      clearSelection();
+      setProjectPicker(null);
+    } catch (err) { setError(err.message); }
+    finally { setBulkBusy(false); }
+  };
+  const bulkExport = () => {
+    const ids = new Set(selectedIds);
+    const payload = testCases.filter((tc) => ids.has(tc.id))
+      .map((tc) => ({
+        id: tc.id, title: tc.title, content: tc.content,
+        priority: tc.priority, folderId: tc.folderId,
+        assigneeUserId: tc.assigneeUserId, jiraIssueKey: tc.jiraIssueKey,
+      }));
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `testcases-export-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  const bulkEditSingle = () => {
+    if (selectedIds.size !== 1) return;
+    const id = Array.from(selectedIds)[0];
+    const n = new URLSearchParams(searchParams);
+    n.set('edit', String(id));
+    setSearchParams(n, { replace: true });
   };
 
   const toggleSelect = (id) => {
@@ -523,20 +645,35 @@ export default function ProjectTestCasesPage() {
           </div>
 
           {selectedIds.size > 0 && (
-            <div className="sticky top-[53px] z-10 bg-brand-50 border-b border-brand-200 px-5 py-2 flex items-center gap-3">
+            <div className="sticky top-[53px] z-10 bg-brand-50 border-b border-brand-200 px-5 py-2 flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium text-brand-800">{selectedIds.size} selected</span>
-              <button onClick={openAddToRun} className="btn-primary btn-sm">
-                <PlayCircle size={14}/> Add to Test Run
+              <button onClick={doCreateRunWithSelection} className="btn-primary btn-sm">
+                <PlayCircle size={14}/> Create Run
               </button>
-              <button onClick={doCreateRunWithSelection} className="btn-secondary btn-sm">
-                <Plus size={14}/> New Run with selection
+              <button onClick={openAddToRun} className="btn-secondary btn-sm">
+                <Plus size={14}/> Add to Run
+              </button>
+              <button onClick={bulkEditSingle} disabled={selectedIds.size !== 1} className="btn-secondary btn-sm disabled:opacity-50" title={selectedIds.size !== 1 ? 'Select exactly one to edit' : 'Edit'}>
+                <Pencil size={14}/> Edit
+              </button>
+              <button onClick={bulkClone} disabled={bulkBusy} className="btn-secondary btn-sm">
+                {bulkBusy ? <Loader2 size={14} className="animate-spin"/> : <Plus size={14}/>} Clone
+              </button>
+              <button onClick={() => openProjectPicker('copy')} className="btn-secondary btn-sm">
+                <Upload size={14}/> Copy to…
+              </button>
+              <button onClick={() => openProjectPicker('move')} className="btn-secondary btn-sm">
+                <Upload size={14}/> Move to…
+              </button>
+              <button onClick={bulkExport} className="btn-secondary btn-sm">
+                <Download size={14}/> Export
               </button>
               <button onClick={clearSelection} className="text-sm text-surface-600 hover:text-surface-900 ml-auto">Clear</button>
             </div>
           )}
 
           {/* Column header */}
-          <div className="px-5 py-2 bg-surface-100/60 border-b border-surface-200/70 grid grid-cols-[24px_60px_1fr_120px_140px_80px] gap-3 items-center text-[11px] font-semibold uppercase tracking-wider text-surface-500">
+          <div className="px-5 py-2 bg-surface-100/60 border-b border-surface-200/70 grid grid-cols-[24px_60px_1fr_120px_140px_120px_80px] gap-3 items-center text-[11px] font-semibold uppercase tracking-wider text-surface-500">
             <input
               type="checkbox"
               checked={visibleTestCases.length > 0 && visibleTestCases.every((tc) => selectedIds.has(tc.id))}
@@ -547,6 +684,7 @@ export default function ProjectTestCasesPage() {
             <div>Title</div>
             <div>Priority</div>
             <div>Folder</div>
+            <div>Assignee</div>
             <div className="text-right">Actions</div>
           </div>
 
@@ -573,8 +711,9 @@ export default function ProjectTestCasesPage() {
             <div className="divide-y divide-surface-200/70 bg-white">
               {visibleTestCases.map((tc) => {
                 const folder = folders.find((f) => f.id === tc.folderId);
+                const assignee = members.find((m) => m.id === tc.assigneeUserId);
                 return (
-                  <div key={tc.id} className={`px-5 py-3 grid grid-cols-[24px_60px_1fr_120px_140px_80px] gap-3 items-center transition-colors ${selectedIds.has(tc.id) ? 'bg-brand-50/60' : 'hover:bg-surface-50'}`}>
+                  <div key={tc.id} className={`px-5 py-3 grid grid-cols-[24px_60px_1fr_120px_140px_120px_80px] gap-3 items-center transition-colors ${selectedIds.has(tc.id) ? 'bg-brand-50/60' : 'hover:bg-surface-50'}`}>
                     <input
                       type="checkbox"
                       checked={selectedIds.has(tc.id)}
@@ -603,6 +742,18 @@ export default function ProjectTestCasesPage() {
                         <option value="">Unassigned</option>
                         {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                       </select>
+                    </div>
+                    <div className="min-w-0">
+                      {assignee ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-surface-700" title={assignee.email}>
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-100 text-brand-700 text-[10px] font-semibold">
+                            {((assignee.displayName || assignee.email || '?').trim().charAt(0) || '?').toUpperCase()}
+                          </span>
+                          <span className="truncate">{assignee.displayName || assignee.email}</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-surface-400 italic">Unassigned</span>
+                      )}
                     </div>
                     <div className="flex items-center justify-end gap-1">
                       <button onClick={() => openEdit(tc)} className="icon-btn" aria-label="Edit"><Pencil size={13} /></button>
@@ -640,7 +791,52 @@ export default function ProjectTestCasesPage() {
         />
       )}
 
-      {/* Edit TC modal */}
+      {/* Edit TC modal — unified with Create via CreateTestCaseModal */}
+      {editingCase && (
+        <CreateTestCaseModal
+          folderName={(() => {
+            const fid = editingCase.folderId;
+            return (fid ? folders.find((f) => f.id === fid)?.name : null) || null;
+          })()}
+          editingCase={editingCase}
+          projectId={projectId}
+          onClose={() => { setEditingCase(null); closeEditFromUrl(); }}
+          onSubmit={handleEditModalSubmit}
+        />
+      )}
+
+      {/* Project picker (Copy to / Move to) */}
+      {projectPicker && (
+        <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setProjectPicker(null)}>
+          <div className="bg-white rounded-xl shadow-soft-lg w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-surface-200/70">
+              <h3 className="font-semibold text-surface-900">
+                {projectPicker.mode === 'move' ? 'Move' : 'Copy'} {selectedIds.size} test case{selectedIds.size === 1 ? '' : 's'} to…
+              </h3>
+              <button onClick={() => setProjectPicker(null)} className="icon-btn"><X size={16}/></button>
+            </div>
+            <ul className="max-h-[60vh] overflow-y-auto divide-y divide-surface-200/70">
+              {(projectsList || []).filter((p) => String(p.id) !== String(projectId)).map((p) => (
+                <li key={p.id}>
+                  <button
+                    onClick={() => doCopyOrMove(p.id)}
+                    disabled={bulkBusy}
+                    className="w-full text-left px-4 py-3 hover:bg-surface-50 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <Folder size={14} className="text-amber-500" />
+                    <span className="text-sm text-surface-900">{p.name}</span>
+                  </button>
+                </li>
+              ))}
+              {(projectsList || []).filter((p) => String(p.id) !== String(projectId)).length === 0 && (
+                <li className="p-6 text-center text-sm text-surface-500">No other projects available.</li>
+              )}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Legacy inline edit modal — kept for editingTc compatibility (unused) */}
       {editingTc && (
         <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setEditingTc(null)}>
           <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>

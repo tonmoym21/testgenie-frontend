@@ -1,8 +1,52 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   X, Plus, Sparkles, Folder, GripVertical, Upload, Loader2,
   Settings2, CheckSquare, Minus, FileText,
 } from 'lucide-react';
+import { api } from '../services/api';
+
+// Parse the markdown content produced by buildContent() back into structured fields.
+function parseContent(content) {
+  const out = { description: '', preconditions: '', steps: [] };
+  if (!content || typeof content !== 'string') return out;
+  const lines = content.split(/\r?\n/);
+  let section = null;
+  const buckets = { description: [], preconditions: [] };
+  const stepEntries = [];
+  let current = null;
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    const h = /^##\s+(.+)/.exec(line);
+    if (h) {
+      const title = h[1].trim().toLowerCase();
+      if (title.startsWith('description')) section = 'description';
+      else if (title.startsWith('precondition')) section = 'preconditions';
+      else if (title.startsWith('step')) section = 'steps';
+      else section = null;
+      current = null;
+      continue;
+    }
+    if (!section) continue;
+    if (section === 'steps') {
+      const m = /^(\d+)\.\s+(.*)$/.exec(line);
+      if (m) {
+        if (current) stepEntries.push(current);
+        current = { step: m[2], result: '' };
+        continue;
+      }
+      const e = /^\s+(?:→\s*)?Expected:\s*(.*)$/i.exec(line);
+      if (e && current) { current.result = e[1]; continue; }
+      if (current && line.trim()) current.step += '\n' + line.trim();
+    } else {
+      buckets[section].push(line);
+    }
+  }
+  if (current) stepEntries.push(current);
+  out.description = buckets.description.join('\n').trim();
+  out.preconditions = buckets.preconditions.join('\n').trim();
+  out.steps = stepEntries;
+  return out;
+}
 
 const PRIORITIES = [
   { value: 'critical', label: 'Critical', color: 'text-red-600' },
@@ -48,20 +92,29 @@ function LabeledField({ label, required, children, hint }) {
   );
 }
 
-export default function CreateTestCaseModal({ folderName, onClose, onSubmit }) {
-  const [title, setTitle] = useState('');
-  const [showDescription, setShowDescription] = useState(false);
-  const [description, setDescription] = useState('');
-  const [preconditions, setPreconditions] = useState('');
+export default function CreateTestCaseModal({ folderName, onClose, onSubmit, editingCase, projectId }) {
+  const isEdit = !!editingCase;
+  const initial = isEdit ? parseContent(editingCase.content) : { description: '', preconditions: '', steps: [] };
+  const [title, setTitle] = useState(editingCase?.title || '');
+  const [showDescription, setShowDescription] = useState(!!initial.description);
+  const [description, setDescription] = useState(initial.description || '');
+  const [preconditions, setPreconditions] = useState(initial.preconditions || '');
   const [template, setTemplate] = useState('Test Case Steps');
-  const [steps, setSteps] = useState([{ id: 1, step: '', result: '' }]);
+  const [steps, setSteps] = useState(() => {
+    if (isEdit && initial.steps.length > 0) {
+      return initial.steps.map((s, i) => ({ id: i + 1, step: s.step || '', result: s.result || '' }));
+    }
+    return [{ id: 1, step: '', result: '' }];
+  });
   const [attachments, setAttachments] = useState([]);
   const [createAnother, setCreateAnother] = useState(false);
+  const [assigneeUserId, setAssigneeUserId] = useState(editingCase?.assigneeUserId || '');
+  const [members, setMembers] = useState([]);
 
   // Sidebar fields
   const [owner, setOwner] = useState('Myself (Tonmoy Malakar)');
   const [state, setState] = useState('Active');
-  const [priority, setPriority] = useState('medium');
+  const [priority, setPriority] = useState(editingCase?.priority || 'medium');
   const [type, setType] = useState('Other');
   const [productArea, setProductArea] = useState('');
   const [automationStatus, setAutomationStatus] = useState('Not Automated');
@@ -74,7 +127,11 @@ export default function CreateTestCaseModal({ folderName, onClose, onSubmit }) {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const fileRef = useRef(null);
-  const nextStepId = useRef(2);
+  const nextStepId = useRef((steps[steps.length - 1]?.id || 1) + 1);
+
+  useEffect(() => {
+    api.listAssignableMembers().then((r) => setMembers(r?.members || [])).catch(() => {});
+  }, []);
 
   const addStep = () => {
     setSteps((prev) => [...prev, { id: nextStepId.current++, step: '', result: '' }]);
@@ -146,10 +203,11 @@ export default function CreateTestCaseModal({ folderName, onClose, onSubmit }) {
         title: title.trim(),
         content: buildContent(),
         priority,
-      }, { keepOpen: createAnother });
-      if (createAnother) resetForNext();
+        assigneeUserId: assigneeUserId ? Number(assigneeUserId) : null,
+      }, { keepOpen: createAnother && !isEdit });
+      if (!isEdit && createAnother) resetForNext();
     } catch (err) {
-      setErrorMsg(err?.message || 'Failed to create test case');
+      setErrorMsg(err?.message || (isEdit ? 'Failed to save test case' : 'Failed to create test case'));
     } finally {
       setSaving(false);
     }
@@ -163,7 +221,7 @@ export default function CreateTestCaseModal({ folderName, onClose, onSubmit }) {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200/70">
-          <h2 className="text-lg font-semibold text-surface-900">Create Test Case</h2>
+          <h2 className="text-lg font-semibold text-surface-900">{isEdit ? 'Edit Test Case' : 'Create Test Case'}</h2>
           <button onClick={onClose} className="icon-btn" aria-label="Close"><X size={18} /></button>
         </div>
 
@@ -353,6 +411,19 @@ export default function CreateTestCaseModal({ folderName, onClose, onSubmit }) {
                 <Select value={owner} onChange={setOwner} options={[owner]} />
               </LabeledField>
 
+              <LabeledField label="Assignee">
+                <select
+                  value={assigneeUserId || ''}
+                  onChange={(e) => setAssigneeUserId(e.target.value)}
+                  className="input w-full text-sm"
+                >
+                  <option value="">Unassigned</option>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>{m.displayName || m.email}</option>
+                  ))}
+                </select>
+              </LabeledField>
+
               <LabeledField label="State" required>
                 <div className="relative">
                   <CheckSquare size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-brand-600 pointer-events-none" />
@@ -472,20 +543,22 @@ export default function CreateTestCaseModal({ folderName, onClose, onSubmit }) {
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-3 border-t border-surface-200/70 bg-white">
-          <label className="inline-flex items-center gap-2 text-sm text-surface-700 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={createAnother}
-              onChange={(e) => setCreateAnother(e.target.checked)}
-              className="rounded border-surface-300"
-            />
-            Create another
-          </label>
+          {!isEdit ? (
+            <label className="inline-flex items-center gap-2 text-sm text-surface-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={createAnother}
+                onChange={(e) => setCreateAnother(e.target.checked)}
+                className="rounded border-surface-300"
+              />
+              Create another
+            </label>
+          ) : <span />}
           <div className="flex items-center gap-2">
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
             <button type="button" onClick={handleSubmit} disabled={saving} className="btn-primary">
               {saving && <Loader2 size={14} className="animate-spin" />}
-              Create
+              {isEdit ? 'Save changes' : 'Create'}
             </button>
           </div>
         </div>

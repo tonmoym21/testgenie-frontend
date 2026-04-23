@@ -534,6 +534,20 @@ export default function TestRunDetailPage() {
   const [sortBy, setSortBy] = useState('custom');
   const [openNotes, setOpenNotes] = useState({});
   const [noteDrafts, setNoteDrafts] = useState({});
+  const [selectedCaseIds, setSelectedCaseIds] = useState(() => new Set());
+  const [members, setMembers] = useState([]);
+  const [bulkMenu, setBulkMenu] = useState(null); // 'status' | 'assign' | null
+  const bulkMenuRef = useRef(null);
+
+  useEffect(() => {
+    api.listAssignableMembers().then((r) => setMembers(r?.members || [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const onClick = (e) => { if (bulkMenuRef.current && !bulkMenuRef.current.contains(e.target)) setBulkMenu(null); };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
 
   const reload = useCallback(async () => {
     try {
@@ -605,7 +619,11 @@ export default function TestRunDetailPage() {
     try {
       await api.setTestRunStepResult(projectId, runId, caseId, stepIndex, { status });
       await reload();
-    } catch (err) { setError(err.message); }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[TestRunDetail] setStepResult failed', { caseId, stepIndex, status, err });
+      setError(`Failed to update step ${stepIndex + 1}: ${err.message}`);
+    }
     finally { setBusy(false); }
   };
 
@@ -651,6 +669,62 @@ export default function TestRunDetailPage() {
       await api.deleteTestRun(projectId, runId);
       navigate(`/projects/${projectId}/test-runs`);
     } catch (err) { setError(err.message); }
+  };
+
+  const toggleSelectCase = (id) => {
+    setSelectedCaseIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+  const toggleSelectAllVisible = () => {
+    setSelectedCaseIds((prev) => {
+      const ids = visibleCases.map((c) => c.id);
+      const allSelected = ids.length > 0 && ids.every((id) => prev.has(id));
+      const n = new Set(prev);
+      if (allSelected) ids.forEach((id) => n.delete(id));
+      else ids.forEach((id) => n.add(id));
+      return n;
+    });
+  };
+  const clearBulkSelection = () => setSelectedCaseIds(new Set());
+
+  const bulkSetStatus = async (status) => {
+    setBusy(true);
+    try {
+      for (const id of selectedCaseIds) {
+        await api.setTestRunResult(projectId, runId, id, { status });
+      }
+      await reload();
+      clearBulkSelection();
+      setBulkMenu(null);
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  };
+  const bulkAssign = async (userId) => {
+    setBusy(true);
+    try {
+      for (const id of selectedCaseIds) {
+        await api.setTestRunCaseAssignee(projectId, runId, id, userId);
+      }
+      await reload();
+      clearBulkSelection();
+      setBulkMenu(null);
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  };
+  const bulkRemove = async () => {
+    if (!confirm(`Remove ${selectedCaseIds.size} case(s) from run?`)) return;
+    setBusy(true);
+    try {
+      for (const id of selectedCaseIds) {
+        await api.removeTestRunCase(projectId, runId, id);
+      }
+      await reload();
+      clearBulkSelection();
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
   };
 
   const goToAdjacent = (delta) => {
@@ -745,6 +819,47 @@ export default function TestRunDetailPage() {
               <span className="ml-2 text-xs text-surface-500">({visibleCases.length})</span>
             </div>
           </div>
+          {selectedCaseIds.size > 0 && (
+            <div className="sticky top-0 z-10 bg-brand-50 border-b border-brand-200 px-4 py-2 flex items-center gap-2 flex-wrap" ref={bulkMenuRef}>
+              <span className="text-sm font-medium text-brand-800">{selectedCaseIds.size} selected</span>
+              <div className="relative">
+                <button className="btn-secondary btn-sm" onClick={() => setBulkMenu((m) => m === 'status' ? null : 'status')}>
+                  Add Result <ChevronDown size={12} />
+                </button>
+                {bulkMenu === 'status' && (
+                  <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-surface-200 rounded-md shadow-soft-lg min-w-[160px] py-1 text-sm">
+                    {['passed','failed','blocked','skipped','retest'].map((k) => (
+                      <button key={k} onClick={() => bulkSetStatus(k)} className="w-full text-left px-3 py-1.5 hover:bg-surface-50 flex items-center gap-2">
+                        {(() => { const I = STATUS_META[k].icon; return <I size={12} style={{ color: STATUS_META[k].color }} />; })()}
+                        {STATUS_META[k].label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="relative">
+                <button className="btn-secondary btn-sm" onClick={() => setBulkMenu((m) => m === 'assign' ? null : 'assign')}>
+                  Assign to <ChevronDown size={12} />
+                </button>
+                {bulkMenu === 'assign' && (
+                  <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-surface-200 rounded-md shadow-soft-lg min-w-[220px] max-h-[260px] overflow-y-auto py-1 text-sm">
+                    <button onClick={() => bulkAssign(null)} className="w-full text-left px-3 py-1.5 hover:bg-surface-50 text-surface-500 italic">Unassign</button>
+                    {members.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-surface-500">No team members</div>
+                    ) : members.map((m) => (
+                      <button key={m.id} onClick={() => bulkAssign(m.id)} className="w-full text-left px-3 py-1.5 hover:bg-surface-50 flex items-center gap-2">
+                        <User size={11} /> {m.displayName || m.email}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button onClick={bulkRemove} className="btn-secondary btn-sm text-red-600 hover:bg-red-50 border-red-200">
+                <Trash2 size={12} /> Remove from Run
+              </button>
+              <button onClick={clearBulkSelection} className="text-xs text-surface-600 hover:text-surface-900 ml-auto">Clear</button>
+            </div>
+          )}
           {visibleCases.length === 0 ? (
             <div className="p-8 text-center text-sm text-surface-500">
               No cases in this folder.
@@ -753,7 +868,12 @@ export default function TestRunDetailPage() {
           ) : (
             <ul>
               <li className="px-4 py-2 border-b border-surface-200/70 bg-surface-50 text-[11px] font-semibold uppercase tracking-wider text-surface-500 grid grid-cols-[32px_70px_1fr_90px_32px] gap-2 items-center">
-                <div />
+                <input
+                  type="checkbox"
+                  checked={visibleCases.length > 0 && visibleCases.every((c) => selectedCaseIds.has(c.id))}
+                  onChange={toggleSelectAllVisible}
+                  aria-label="Select all visible"
+                />
                 <div>ID</div>
                 <div>Title</div>
                 <div className="text-right">Status</div>
@@ -765,7 +885,13 @@ export default function TestRunDetailPage() {
                   onClick={() => setSelectedCaseId(c.id)}
                   className={`px-4 py-2.5 grid grid-cols-[32px_70px_1fr_90px_32px] gap-2 items-center cursor-pointer border-b border-surface-100 text-sm ${selectedCaseId === c.id ? 'bg-brand-50/60' : 'hover:bg-surface-50'}`}
                 >
-                  <input type="checkbox" onClick={(e) => e.stopPropagation()} />
+                  <input
+                    type="checkbox"
+                    checked={selectedCaseIds.has(c.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleSelectCase(c.id)}
+                    aria-label={`Select ${c.title}`}
+                  />
                   <span className="font-mono text-xs text-surface-500">TC-{c.id}</span>
                   <span className="truncate text-surface-800">{c.title}</span>
                   <div className="flex justify-end"><StatusPill status={c.status} /></div>

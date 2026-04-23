@@ -263,6 +263,10 @@ class ApiService {
   async setTestRunStepNote(projectId, id, caseId, stepIndex, data) { return this.request('PATCH', `/projects/${projectId}/test-runs/${id}/cases/${caseId}/steps/${stepIndex}/note`, data); }
   async getTestRunExecutionLog(projectId, id) { return this.request('GET', `/projects/${projectId}/test-runs/${id}/execution-log`); }
   async resetTestRunCase(projectId, id, caseId) { return this.request('PATCH', `/projects/${projectId}/test-runs/${id}/cases/${caseId}/result`, { status: 'untested' }); }
+  async setTestRunCaseAssignee(projectId, id, caseId, assigneeUserId) { return this.request('PATCH', `/projects/${projectId}/test-runs/${id}/cases/${caseId}/assignee`, { assigneeUserId: assigneeUserId || null }); }
+
+  // ── Team ──────────────────────────────────────────────────────────────────
+  async listAssignableMembers() { return this.request('GET', '/team/assignable-members'); }
 
   // ── Test Cases ────────────────────────────────────────────────────────────
   async getTestCases(projectId, params = {}) { const q = new URLSearchParams(params).toString(); return this.request('GET', `/projects/${projectId}/testcases${q ? '?' + q : ''}`); }
