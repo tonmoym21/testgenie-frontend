@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import {
-  ArrowLeft, Plus, Loader2, X, CheckCircle2, XCircle, Circle,
-  MinusCircle, SkipForward, RotateCcw, Trash2, Search,
+  ChevronRight, ChevronDown, Plus, Loader2, X, CheckCircle2, XCircle, Circle,
+  MinusCircle, SkipForward, RotateCcw, Trash2, Search, Folder, FolderOpen,
+  User, Clock, Edit2,
 } from 'lucide-react';
 
 const STATUS_META = {
@@ -15,7 +16,7 @@ const STATUS_META = {
   retest:   { label: 'Retest',   color: '#8b5cf6', bg: 'bg-violet-50',  text: 'text-violet-700',  icon: RotateCcw },
 };
 
-function StatusBadge({ status }) {
+function StatusPill({ status }) {
   const meta = STATUS_META[status] || STATUS_META.untested;
   const Icon = meta.icon;
   return (
@@ -25,45 +26,82 @@ function StatusBadge({ status }) {
   );
 }
 
-// Pure SVG donut — no library
-function StatsDonut({ byStatus, total }) {
-  const size = 140;
-  const stroke = 18;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const order = ['passed', 'failed', 'blocked', 'skipped', 'retest', 'untested'];
-  let offset = 0;
-  const segs = [];
-  for (const k of order) {
-    const v = byStatus[k] || 0;
-    if (v === 0) continue;
-    const frac = total > 0 ? v / total : 0;
-    const len = frac * circumference;
-    segs.push(
-      <circle
-        key={k}
-        cx={size / 2} cy={size / 2} r={radius}
-        fill="none"
-        stroke={STATUS_META[k].color}
-        strokeWidth={stroke}
-        strokeDasharray={`${len} ${circumference - len}`}
-        strokeDashoffset={-offset}
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-      />
-    );
-    offset += len;
+/** Parse test case markdown content into structured sections.
+ *  Recognized:
+ *    ## Description / ## Preconditions (free text)
+ *    ## Steps — numbered steps with optional "   → Expected: ..." line
+ */
+function parseCaseContent(content) {
+  if (!content || typeof content !== 'string') return { description: '', preconditions: '', steps: [] };
+  const lines = content.split(/\r?\n/);
+  let section = null;
+  const buckets = { description: [], preconditions: [], steps: [] };
+  const stepEntries = [];
+  let currentStep = null;
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    const h = /^##\s+(.+)/.exec(line);
+    if (h) {
+      const title = h[1].trim().toLowerCase();
+      if (title.startsWith('description')) section = 'description';
+      else if (title.startsWith('precondition')) section = 'preconditions';
+      else if (title.startsWith('step')) section = 'steps';
+      else section = null;
+      currentStep = null;
+      continue;
+    }
+    if (!section) continue;
+    if (section === 'steps') {
+      const stepMatch = /^(\d+)\.\s+(.*)$/.exec(line);
+      if (stepMatch) {
+        if (currentStep) stepEntries.push(currentStep);
+        currentStep = { index: stepEntries.length, step: stepMatch[2], result: '' };
+        continue;
+      }
+      const expMatch = /^\s+(?:→\s*)?Expected:\s*(.*)$/i.exec(line);
+      if (expMatch && currentStep) {
+        currentStep.result = expMatch[1];
+        continue;
+      }
+      if (currentStep && line.trim()) {
+        currentStep.step += '\n' + line.trim();
+      }
+    } else {
+      buckets[section].push(line);
+    }
   }
-  const executed = (byStatus.passed || 0) + (byStatus.failed || 0) + (byStatus.blocked || 0) + (byStatus.skipped || 0);
-  const pct = total > 0 ? Math.round((executed / total) * 100) : 0;
+  if (currentStep) stepEntries.push(currentStep);
+  return {
+    description: buckets.description.join('\n').trim(),
+    preconditions: buckets.preconditions.join('\n').trim(),
+    steps: stepEntries.length > 0 ? stepEntries : [],
+  };
+}
+
+function ProgressBar({ progress, byStatus, total }) {
+  const segs = ['passed', 'failed', 'blocked', 'skipped', 'retest'].map((k) => ({
+    k, count: byStatus?.[k] || 0, color: STATUS_META[k].color,
+  })).filter((s) => s.count > 0);
   return (
-    <div className="relative">
-      <svg width={size} height={size}>
-        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="#f1f5f9" strokeWidth={stroke} />
-        {segs}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-2xl font-semibold text-surface-900">{pct}%</div>
-        <div className="text-xs text-surface-500">{executed}/{total}</div>
+    <div className="w-full">
+      <div className="flex h-2 rounded-full overflow-hidden bg-surface-100">
+        {segs.map((s) => (
+          <div key={s.k} style={{ width: `${total > 0 ? (s.count / total) * 100 : 0}%`, backgroundColor: s.color }} />
+        ))}
+      </div>
+      <div className="mt-2 flex items-center gap-4 text-xs text-surface-600">
+        <span className="font-medium text-surface-900">{progress}% Completed</span>
+        {['passed','failed','blocked','skipped','retest'].map((k) => {
+          const c = byStatus?.[k] || 0;
+          if (c === 0) return null;
+          const pct = total > 0 ? Math.round((c / total) * 100) : 0;
+          return (
+            <span key={k} className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: STATUS_META[k].color }} />
+              {STATUS_META[k].label} {c} ({pct}%)
+            </span>
+          );
+        })}
       </div>
     </div>
   );
@@ -91,25 +129,18 @@ function AddCasesModal({ projectId, existingIds, onClose, onAdded }) {
     return cases.filter((c) => !existing.has(c.id) && (!t || c.title.toLowerCase().includes(t)));
   }, [cases, q, existing]);
 
-  const toggle = (id) => {
-    setSelected((prev) => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
-  };
+  const toggle = (id) => setSelected((prev) => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
   const toggleAll = () => {
     if (selected.size === filtered.length) setSelected(new Set());
     else setSelected(new Set(filtered.map((c) => c.id)));
   };
-
   const handleAdd = async () => {
     if (selected.size === 0) return;
     setSaving(true);
-    try {
-      await onAdded(Array.from(selected));
-      onClose();
-    } finally { setSaving(false); }
+    try { await onAdded(Array.from(selected)); onClose(); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -163,48 +194,181 @@ function AddCasesModal({ projectId, existingIds, onClose, onAdded }) {
   );
 }
 
+function FolderTree({ folders, cases, selectedFolderId, onSelect }) {
+  // Build tree: map of parent -> children; include counts.
+  const byId = new Map(folders.map((f) => [f.id, { ...f, children: [] }]));
+  const roots = [];
+  for (const f of byId.values()) {
+    if (f.parentId && byId.has(f.parentId)) byId.get(f.parentId).children.push(f);
+    else roots.push(f);
+  }
+  const countsByFolder = useMemo(() => {
+    const m = new Map();
+    for (const c of cases) {
+      const k = c.folderId || 0;
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return m;
+  }, [cases]);
+
+  const [expanded, setExpanded] = useState(() => new Set(roots.map((r) => r.id)));
+  const toggle = (id) => setExpanded((prev) => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+
+  function FolderNode({ node, depth }) {
+    const count = countsByFolder.get(node.id) || 0;
+    const isOpen = expanded.has(node.id);
+    const hasKids = node.children.length > 0;
+    const active = selectedFolderId === node.id;
+    return (
+      <div>
+        <div
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-sm cursor-pointer ${active ? 'bg-brand-50 text-brand-700' : 'hover:bg-surface-50 text-surface-700'}`}
+          style={{ paddingLeft: 8 + depth * 14 }}
+          onClick={() => onSelect(node.id)}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); if (hasKids) toggle(node.id); }}
+            className={`w-4 h-4 flex items-center justify-center shrink-0 ${hasKids ? 'text-surface-500' : 'invisible'}`}
+          >
+            {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          </button>
+          {isOpen && hasKids ? <FolderOpen size={14} className="text-amber-500 shrink-0" /> : <Folder size={14} className="text-amber-500 shrink-0" />}
+          <span className="truncate flex-1">{node.name}</span>
+          <span className="text-xs text-surface-500 tabular-nums shrink-0">{count}</span>
+        </div>
+        {isOpen && hasKids && (
+          <div>
+            {node.children.map((c) => <FolderNode key={c.id} node={c} depth={depth + 1} />)}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const allCount = cases.length;
+  const uncategorizedCount = countsByFolder.get(0) || 0;
+
+  return (
+    <div className="p-2">
+      <div
+        className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-sm cursor-pointer ${selectedFolderId === 'all' ? 'bg-brand-50 text-brand-700' : 'hover:bg-surface-50 text-surface-700'}`}
+        onClick={() => onSelect('all')}
+      >
+        <Folder size={14} className="text-brand-500" />
+        <span className="font-medium flex-1">All Test Cases</span>
+        <span className="text-xs text-surface-500 tabular-nums">{allCount}</span>
+      </div>
+      {roots.map((r) => <FolderNode key={r.id} node={r} depth={0} />)}
+      {uncategorizedCount > 0 && (
+        <div
+          className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-sm cursor-pointer mt-1 ${selectedFolderId === 'uncategorized' ? 'bg-brand-50 text-brand-700' : 'hover:bg-surface-50 text-surface-700'}`}
+          onClick={() => onSelect('uncategorized')}
+        >
+          <Folder size={14} className="text-surface-400" />
+          <span className="flex-1 italic">Uncategorized</span>
+          <span className="text-xs text-surface-500 tabular-nums">{uncategorizedCount}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StepActionButtons({ currentStatus, onSet, disabled }) {
+  return (
+    <div className="inline-flex items-center rounded-md border border-surface-200 overflow-hidden divide-x divide-surface-200">
+      {[
+        { k: 'passed', label: 'Pass', cls: 'text-emerald-700 hover:bg-emerald-50', activeCls: 'bg-emerald-50 text-emerald-700' },
+        { k: 'failed', label: 'Fail', cls: 'text-red-700 hover:bg-red-50', activeCls: 'bg-red-50 text-red-700' },
+        { k: 'skipped', label: 'Skip', cls: 'text-amber-700 hover:bg-amber-50', activeCls: 'bg-amber-50 text-amber-700' },
+      ].map((b) => {
+        const active = currentStatus === b.k;
+        const Icon = STATUS_META[b.k].icon;
+        return (
+          <button
+            key={b.k}
+            disabled={disabled}
+            onClick={() => onSet(b.k)}
+            className={`px-2.5 py-1 text-xs font-medium inline-flex items-center gap-1 ${active ? b.activeCls : b.cls} disabled:opacity-50`}
+          >
+            <Icon size={11} /> {b.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TestRunDetailPage() {
   const { projectId, runId } = useParams();
   const navigate = useNavigate();
   const [run, setRun] = useState(null);
   const [cases, setCases] = useState([]);
+  const [folders, setFolders] = useState([]);
   const [stats, setStats] = useState({ total: 0, executed: 0, passRate: 0, progress: 0, byStatus: {} });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAdd, setShowAdd] = useState(false);
-  const [commentOpenFor, setCommentOpenFor] = useState(null);
-  const [commentText, setCommentText] = useState('');
-  const [busyId, setBusyId] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState('all');
+  const [selectedCaseId, setSelectedCaseId] = useState(null);
 
   const reload = useCallback(async () => {
     try {
-      const [r, c, s] = await Promise.all([
+      const [r, c, s, f] = await Promise.all([
         api.getTestRun(projectId, runId),
         api.getTestRunCases(projectId, runId),
         api.getTestRunStats(projectId, runId),
+        api.getFolders(projectId).catch(() => ({ data: [] })),
       ]);
-      setRun(r); setCases(c.data || []); setStats(s);
+      setRun(r);
+      setCases(c.data || []);
+      setStats(s);
+      setFolders((f?.data || f || []).map((x) => ({ ...x, parentId: x.parentId ?? x.parent_id })));
+      // default selection
+      if (!selectedCaseId && (c.data || []).length > 0) setSelectedCaseId((c.data || [])[0].id);
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
-  }, [projectId, runId]);
+  }, [projectId, runId, selectedCaseId]);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => { reload(); /* eslint-disable-next-line */ }, [projectId, runId]);
 
-  const setResult = async (caseId, status, comment) => {
-    setBusyId(caseId);
+  const visibleCases = useMemo(() => {
+    if (selectedFolder === 'all') return cases;
+    if (selectedFolder === 'uncategorized') return cases.filter((c) => !c.folderId);
+    return cases.filter((c) => c.folderId === selectedFolder);
+  }, [cases, selectedFolder]);
+
+  const selectedCase = useMemo(
+    () => cases.find((c) => c.id === selectedCaseId) || visibleCases[0] || null,
+    [cases, selectedCaseId, visibleCases]
+  );
+
+  const parsed = useMemo(() => parseCaseContent(selectedCase?.content), [selectedCase]);
+
+  const setCaseResult = async (caseId, status) => {
+    setBusy(true);
     try {
-      await api.setTestRunResult(projectId, runId, caseId, { status, comment: comment || null });
+      await api.setTestRunResult(projectId, runId, caseId, { status });
       await reload();
     } catch (err) { setError(err.message); }
-    finally { setBusyId(null); }
+    finally { setBusy(false); }
+  };
+
+  const setStepResult = async (caseId, stepIndex, status) => {
+    setBusy(true);
+    try {
+      await api.setTestRunStepResult(projectId, runId, caseId, stepIndex, { status });
+      await reload();
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
   };
 
   const removeCase = async (caseId) => {
     if (!confirm('Remove this test case from the run?')) return;
-    try {
-      await api.removeTestRunCase(projectId, runId, caseId);
-      await reload();
-    } catch (err) { setError(err.message); }
+    try { await api.removeTestRunCase(projectId, runId, caseId); await reload(); }
+    catch (err) { setError(err.message); }
   };
 
   const handleAdd = async (ids) => {
@@ -216,24 +380,45 @@ export default function TestRunDetailPage() {
     return <div className="p-6 text-surface-500"><Loader2 className="inline animate-spin mr-2" size={14}/>Loading test run…</div>;
   }
 
+  const runStatus = run?.state === 'completed' || run?.state === 'closed' ? 'passed' : 'untested';
+  const runStatusLabel = run?.state === 'completed' ? 'Completed'
+    : run?.state === 'closed' ? 'Closed'
+    : run?.state === 'in_progress' ? 'In Progress' : 'New';
+
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-4rem)] bg-surface-50">
+      {/* Header */}
       <div className="px-6 pt-5 pb-4 border-b border-surface-200/70 bg-white">
-        <Link to={`/projects/${projectId}/test-runs`} className="inline-flex items-center gap-1.5 text-xs text-surface-500 hover:text-surface-800 mb-2">
-          <ArrowLeft size={12} /> Back to test runs
-        </Link>
+        <nav className="flex items-center gap-1.5 text-sm text-surface-500 mb-2">
+          <Link to={`/projects/${projectId}/test-runs`} className="hover:text-brand-600">Test Runs</Link>
+          <ChevronRight size={14} />
+          <span className="text-surface-900 font-mono text-xs">TR-{run?.id}</span>
+        </nav>
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-semibold text-surface-900 truncate">{run?.name}</h1>
-            <div className="mt-1 text-sm text-surface-500 flex items-center gap-3">
-              <span className="capitalize">State: <span className="font-medium text-surface-800">{String(run?.state || '').replace('_', ' ')}</span></span>
-              {run?.assigneeName && <span>Assignee: <span className="font-medium text-surface-800">{run.assigneeName}</span></span>}
-              <span>{stats.total} test cases</span>
+            <div className="mt-2 flex items-center gap-4 text-sm text-surface-600 flex-wrap">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                run?.state === 'completed' || run?.state === 'closed' ? 'bg-emerald-50 text-emerald-700'
+                : run?.state === 'in_progress' ? 'bg-brand-50 text-brand-700'
+                : 'bg-surface-100 text-surface-700'
+              }`}>
+                <CheckCircle2 size={12} /> {runStatusLabel}
+              </span>
+              {(run?.assigneeName || run?.assigneeEmail) && (
+                <span className="inline-flex items-center gap-1"><User size={13} /> {run.assigneeName || run.assigneeEmail}</span>
+              )}
+              {run?.createdAt && (
+                <span className="inline-flex items-center gap-1"><Clock size={13} /> {new Date(run.createdAt).toLocaleString()}</span>
+              )}
             </div>
           </div>
-          <button onClick={() => setShowAdd(true)} className="btn-primary btn-sm">
-            <Plus size={14} /> Add Test Cases
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowAdd(true)} className="btn-secondary btn-sm"><Plus size={14} /> Add Cases</button>
+          </div>
+        </div>
+        <div className="mt-4">
+          <ProgressBar progress={stats.progress} byStatus={stats.byStatus} total={stats.total} />
         </div>
       </div>
 
@@ -244,102 +429,153 @@ export default function TestRunDetailPage() {
         </div>
       )}
 
-      {/* Stats / chart */}
-      <div className="px-6 py-5 bg-surface-50 border-b border-surface-200/70">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg border border-surface-200/70 p-4 flex items-center gap-4">
-            <StatsDonut byStatus={stats.byStatus} total={stats.total} />
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold uppercase tracking-wide text-surface-500 mb-2">Execution progress</div>
-              <div className="text-sm text-surface-700 space-y-1">
-                <div className="flex justify-between"><span>Executed</span><span className="font-medium">{stats.executed} / {stats.total}</span></div>
-                <div className="flex justify-between"><span>Pass rate</span><span className="font-medium text-emerald-700">{stats.passRate}%</span></div>
-              </div>
-            </div>
-          </div>
-          <div className="md:col-span-2 bg-white rounded-lg border border-surface-200/70 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-surface-500 mb-3">Results by status</div>
-            <div className="space-y-2">
-              {['passed','failed','blocked','skipped','retest','untested'].map((k) => {
-                const count = stats.byStatus[k] || 0;
-                const pct = stats.total > 0 ? (count / stats.total) * 100 : 0;
-                const meta = STATUS_META[k];
-                return (
-                  <div key={k} className="flex items-center gap-3">
-                    <div className="w-20 text-xs text-surface-600">{meta.label}</div>
-                    <div className="flex-1 h-2 bg-surface-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: meta.color }} />
-                    </div>
-                    <div className="w-12 text-right text-xs font-medium text-surface-700 tabular-nums">{count}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Three-column layout */}
+      <div className="grid grid-cols-[240px_minmax(0,1fr)_420px] gap-0 h-[calc(100vh-200px)]">
+        {/* Left — folder tree */}
+        <aside className="bg-white border-r border-surface-200/70 overflow-y-auto">
+          <div className="px-3 py-2 border-b border-surface-200/70 text-xs font-semibold uppercase tracking-wider text-surface-500">All Test Cases</div>
+          <FolderTree folders={folders} cases={cases} selectedFolderId={selectedFolder} onSelect={setSelectedFolder} />
+        </aside>
 
-      {/* Cases */}
-      <div className="px-6 py-4">
-        {cases.length === 0 ? (
-          <div className="text-center py-16 border border-dashed border-surface-300 rounded-lg bg-white">
-            <p className="text-surface-700 font-medium mb-1">No test cases in this run yet</p>
-            <p className="text-sm text-surface-500 mb-4">Add test cases from your project to start executing.</p>
-            <button onClick={() => setShowAdd(true)} className="btn-primary btn-sm"><Plus size={14}/> Add Test Cases</button>
-          </div>
-        ) : (
-          <div className="bg-white border border-surface-200/70 rounded-lg overflow-hidden">
-            <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-surface-100/60 border-b border-surface-200/70 text-[11px] font-semibold uppercase tracking-wider text-surface-500">
-              <div className="col-span-1">ID</div>
-              <div className="col-span-4">Title</div>
-              <div className="col-span-2">Status</div>
-              <div className="col-span-4">Execute</div>
-              <div className="col-span-1 text-right">Remove</div>
+        {/* Middle — case list */}
+        <section className="bg-white border-r border-surface-200/70 overflow-y-auto">
+          <div className="px-4 py-2 border-b border-surface-200/70 flex items-center justify-between">
+            <div className="text-sm font-medium text-surface-800">
+              {selectedFolder === 'all' ? 'All' : selectedFolder === 'uncategorized' ? 'Uncategorized' : folders.find((f) => f.id === selectedFolder)?.name || 'Folder'}
+              <span className="ml-2 text-xs text-surface-500">({visibleCases.length})</span>
             </div>
-            <ul className="divide-y divide-surface-200/70">
-              {cases.map((c) => (
-                <li key={c.id} className="px-4 py-3 grid grid-cols-12 gap-2 items-center text-sm">
-                  <div className="col-span-1 text-xs font-mono text-surface-500">TC-{c.id}</div>
-                  <div className="col-span-4 min-w-0">
-                    <div className="font-medium text-surface-900 truncate">{c.title}</div>
-                    {c.jiraIssueKey && <div className="text-[11px] text-brand-600">🔗 {c.jiraIssueKey}</div>}
-                    {c.comment && <div className="text-xs text-surface-500 truncate">“{c.comment}”</div>}
-                  </div>
-                  <div className="col-span-2"><StatusBadge status={c.status} /></div>
-                  <div className="col-span-4 flex items-center gap-1 flex-wrap">
-                    {['passed','failed','blocked','skipped','retest'].map((k) => {
-                      const meta = STATUS_META[k];
-                      const Icon = meta.icon;
-                      const active = c.status === k;
-                      return (
-                        <button
-                          key={k}
-                          onClick={() => setResult(c.id, k)}
-                          disabled={busyId === c.id}
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border transition-colors ${
-                            active ? `${meta.bg} ${meta.text} border-current` : 'bg-white text-surface-600 border-surface-200 hover:bg-surface-50'
-                          }`}
-                          title={`Mark as ${meta.label}`}
-                        >
-                          <Icon size={11} /> {meta.label}
-                        </button>
-                      );
-                    })}
-                    <button
-                      onClick={() => { setCommentOpenFor(c.id); setCommentText(c.comment || ''); }}
-                      className="text-xs text-brand-600 hover:text-brand-700 px-2 py-1"
-                    >
-                      {c.comment ? 'Edit note' : 'Add note'}
-                    </button>
-                  </div>
-                  <div className="col-span-1 text-right">
-                    <button onClick={() => removeCase(c.id)} className="icon-btn hover:text-red-500"><Trash2 size={13}/></button>
-                  </div>
+          </div>
+          {visibleCases.length === 0 ? (
+            <div className="p-8 text-center text-sm text-surface-500">
+              No cases in this folder.
+              <div className="mt-3"><button onClick={() => setShowAdd(true)} className="btn-primary btn-sm"><Plus size={14}/> Add Test Cases</button></div>
+            </div>
+          ) : (
+            <ul>
+              <li className="px-4 py-2 border-b border-surface-200/70 bg-surface-50 text-[11px] font-semibold uppercase tracking-wider text-surface-500 grid grid-cols-[32px_70px_1fr_80px] gap-2 items-center">
+                <div />
+                <div>ID</div>
+                <div>Title</div>
+                <div className="text-right">Status</div>
+              </li>
+              {visibleCases.map((c) => (
+                <li
+                  key={c.id}
+                  onClick={() => setSelectedCaseId(c.id)}
+                  className={`px-4 py-2.5 grid grid-cols-[32px_70px_1fr_80px] gap-2 items-center cursor-pointer border-b border-surface-100 text-sm ${selectedCaseId === c.id ? 'bg-brand-50/60' : 'hover:bg-surface-50'}`}
+                >
+                  <input type="checkbox" onClick={(e) => e.stopPropagation()} />
+                  <span className="font-mono text-xs text-surface-500">TC-{c.id}</span>
+                  <span className="truncate text-surface-800">{c.title}</span>
+                  <div className="flex justify-end"><StatusPill status={c.status} /></div>
                 </li>
               ))}
             </ul>
-          </div>
-        )}
+          )}
+        </section>
+
+        {/* Right — details panel */}
+        <aside className="bg-white overflow-y-auto">
+          {!selectedCase ? (
+            <div className="p-8 text-center text-sm text-surface-500">Select a test case to see details.</div>
+          ) : (
+            <div className="flex flex-col h-full">
+              <div className="px-5 py-3 border-b border-surface-200/70 flex items-center justify-between">
+                <div className="text-xs font-semibold uppercase tracking-wider text-surface-500">Test Case Details</div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => removeCase(selectedCase.id)} className="icon-btn hover:text-red-500" title="Remove from run"><Trash2 size={14}/></button>
+                  <button onClick={() => navigate(`/projects/${projectId}/test-cases?edit=${selectedCase.id}`)} className="icon-btn" title="Edit case"><Edit2 size={13}/></button>
+                </div>
+              </div>
+
+              <div className="px-5 py-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-xs font-mono text-surface-500">TC-{selectedCase.id}</div>
+                    <h2 className="text-base font-semibold text-surface-900 mt-0.5">{selectedCase.title}</h2>
+                  </div>
+                  <StatusPill status={selectedCase.status} />
+                </div>
+
+                {/* Per-case quick actions */}
+                <div className="mt-3 flex flex-wrap items-center gap-1">
+                  <span className="text-xs text-surface-500 mr-1">Mark case:</span>
+                  {['passed','failed','blocked','skipped','retest'].map((k) => {
+                    const meta = STATUS_META[k]; const Icon = meta.icon;
+                    const active = selectedCase.status === k;
+                    return (
+                      <button
+                        key={k}
+                        disabled={busy}
+                        onClick={() => setCaseResult(selectedCase.id, k)}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${active ? `${meta.bg} ${meta.text} border-current` : 'bg-white text-surface-600 border-surface-200 hover:bg-surface-50'} disabled:opacity-50`}
+                      >
+                        <Icon size={10} /> {meta.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Description */}
+                {parsed.description && (
+                  <div className="mt-5">
+                    <div className="text-xs font-semibold text-surface-700 mb-1">Description</div>
+                    <p className="text-sm text-surface-700 whitespace-pre-line">{parsed.description}</p>
+                  </div>
+                )}
+
+                {/* Preconditions */}
+                {parsed.preconditions && (
+                  <div className="mt-4">
+                    <div className="text-xs font-semibold text-surface-700 mb-1">Preconditions</div>
+                    <p className="text-sm text-surface-700 whitespace-pre-line">{parsed.preconditions}</p>
+                  </div>
+                )}
+
+                {/* Steps & Results */}
+                <div className="mt-5">
+                  <div className="text-xs font-semibold text-surface-700 mb-2">All Steps & Results:</div>
+                  {parsed.steps.length === 0 ? (
+                    <div className="text-sm text-surface-500 italic">No structured steps — use case-level actions above.</div>
+                  ) : (
+                    <ul className="space-y-3">
+                      {parsed.steps.map((step, idx) => {
+                        const stepRes = Array.isArray(selectedCase.stepResults) ? selectedCase.stepResults[idx] : null;
+                        const stepStatus = stepRes?.status || 'untested';
+                        return (
+                          <li key={idx} className="border border-surface-200 rounded-lg p-3 bg-white">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-sm font-semibold text-surface-800">Step {String(idx + 1).padStart(2, '0')}</div>
+                              <StatusPill status={stepStatus} />
+                            </div>
+                            <div className="mt-1.5 text-sm text-surface-800 whitespace-pre-line">{step.step}</div>
+                            {step.result && (
+                              <div className="mt-2 text-sm">
+                                <span className="text-xs font-semibold text-surface-700">Result:</span>
+                                <div className="text-surface-700 whitespace-pre-line">{step.result}</div>
+                              </div>
+                            )}
+                            <div className="mt-2">
+                              <StepActionButtons
+                                currentStatus={stepStatus}
+                                disabled={busy}
+                                onSet={(s) => setStepResult(selectedCase.id, idx, s)}
+                              />
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                {selectedCase.jiraIssueKey && (
+                  <div className="mt-5 text-xs text-brand-600">🔗 Linked to Jira: {selectedCase.jiraIssueKey}</div>
+                )}
+              </div>
+            </div>
+          )}
+        </aside>
       </div>
 
       {showAdd && (
@@ -349,37 +585,6 @@ export default function TestRunDetailPage() {
           onClose={() => setShowAdd(false)}
           onAdded={handleAdd}
         />
-      )}
-
-      {commentOpenFor && (
-        <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setCommentOpenFor(null)}>
-          <div className="bg-white rounded-xl shadow-soft-lg w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-surface-200/70">
-              <h3 className="font-semibold text-surface-900">Execution note</h3>
-              <button onClick={() => setCommentOpenFor(null)} className="icon-btn"><X size={16}/></button>
-            </div>
-            <div className="p-5">
-              <textarea
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                rows={5}
-                className="input text-sm"
-                placeholder="Describe the result, attach steps to reproduce, link logs, etc."
-              />
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-surface-200/70">
-              <button onClick={() => setCommentOpenFor(null)} className="btn-secondary">Cancel</button>
-              <button
-                onClick={async () => {
-                  const c = cases.find((x) => x.id === commentOpenFor);
-                  await setResult(commentOpenFor, c?.status || 'untested', commentText);
-                  setCommentOpenFor(null);
-                }}
-                className="btn-primary"
-              >Save</button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

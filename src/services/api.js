@@ -259,6 +259,7 @@ class ApiService {
   async removeTestRunCase(projectId, id, caseId) { return this.request('DELETE', `/projects/${projectId}/test-runs/${id}/cases/${caseId}`); }
   async setTestRunResult(projectId, id, caseId, data) { return this.request('PATCH', `/projects/${projectId}/test-runs/${id}/cases/${caseId}/result`, data); }
   async getTestRunStats(projectId, id) { return this.request('GET', `/projects/${projectId}/test-runs/${id}/stats`); }
+  async setTestRunStepResult(projectId, id, caseId, stepIndex, data) { return this.request('PATCH', `/projects/${projectId}/test-runs/${id}/cases/${caseId}/steps/${stepIndex}/result`, data); }
 
   // ── Test Cases ────────────────────────────────────────────────────────────
   async getTestCases(projectId, params = {}) { const q = new URLSearchParams(params).toString(); return this.request('GET', `/projects/${projectId}/testcases${q ? '?' + q : ''}`); }

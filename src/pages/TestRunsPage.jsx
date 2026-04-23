@@ -1,21 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { getCurrentProjectId } from '../utils/currentProject';
 import {
   Plus, Search, Filter, ChevronDown, CheckCircle2, XCircle, Loader2,
-  MoreHorizontal, Play, LayoutGrid, List as ListIcon, User, Sparkles,
+  MoreHorizontal, Play, LayoutGrid, User, Sparkles,
 } from 'lucide-react';
-
-function formatDuration(ms) {
-  if (!ms && ms !== 0) return '—';
-  if (ms < 1000) return `${ms}ms`;
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const rem = s % 60;
-  return rem ? `${m}m ${rem}s` : `${m}m`;
-}
 
 function formatDate(iso) {
   if (!iso) return '';
@@ -24,33 +14,27 @@ function formatDate(iso) {
   } catch { return ''; }
 }
 
-// Donut/check status glyph — matches the screenshot's green check / percentage circle.
-function RunStatusGlyph({ status, percent = 0 }) {
-  if (status === 'passed') {
+function formatDuration(startIso, endIso) {
+  if (!startIso || !endIso) return '—';
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  if (!(ms > 0)) return '—';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem ? `${m}m ${rem}s` : `${m}m`;
+}
+
+function RunStatusGlyph({ state, progress }) {
+  if (state === 'completed' || state === 'closed') {
     return (
       <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
         <CheckCircle2 size={20} />
       </div>
     );
   }
-  if (status === 'failed') {
-    return (
-      <div className="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center shrink-0">
-        <XCircle size={20} />
-      </div>
-    );
-  }
-  if (status === 'running') {
-    return (
-      <div className="w-10 h-10 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-        <Loader2 size={18} className="animate-spin" />
-      </div>
-    );
-  }
-  // percentage ring for in-progress with known progress (like 79% in screenshot)
-  const p = Math.max(0, Math.min(100, percent));
-  const angle = (p / 100) * 360;
-  const bg = `conic-gradient(#2563eb ${angle}deg, #e5e7eb 0deg)`;
+  const p = Math.max(0, Math.min(100, progress || 0));
+  const bg = `conic-gradient(#2563eb ${(p / 100) * 360}deg, #e5e7eb 0deg)`;
   return (
     <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: bg }}>
       <div className="w-[30px] h-[30px] rounded-full bg-white flex items-center justify-center">
@@ -60,38 +44,11 @@ function RunStatusGlyph({ status, percent = 0 }) {
   );
 }
 
-function normalizeExecution(exec, i) {
-  // Map a raw execution from /executions to a "run-shaped" row for the UI.
-  const id = exec.id;
-  const status = exec.status || 'running';
-  // Invent a friendly run name and code — use story/name + id.
-  const name = exec.testName || exec.name || `Run ${id}`;
-  const code = `TR-${id}`;
-  const createdBy = exec.createdBy || exec.userEmail || exec.owner || 'You';
-  const createdAt = exec.completedAt || exec.createdAt || exec.startedAt;
-  const pass = status === 'passed' ? 1 : 0;
-  const fail = status === 'failed' ? 1 : 0;
-  const untested = status === 'running' ? 1 : 0;
-  return {
-    id,
-    code,
-    name,
-    status,
-    assignee: createdBy,
-    createdAt,
-    tests: pass + fail + untested || 1,
-    passed: pass,
-    failed: fail,
-    blocked: 0,
-    untested,
-    durationMs: exec.durationMs ?? exec.duration_ms ?? null,
-    percent: status === 'running' ? 0 : status === 'passed' ? 100 : null,
-  };
-}
-
 export default function TestRunsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { projectId: routeProjectId } = useParams();
+  const projectId = routeProjectId || getCurrentProjectId();
 
   const initialTab = searchParams.get('tab') === 'closed' ? 'closed' : 'active';
   const [tab, setTab] = useState(initialTab);
@@ -109,17 +66,24 @@ export default function TestRunsPage() {
   }, []);
 
   const load = useCallback(async () => {
+    if (!projectId) { setLoading(false); return; }
     setLoading(true);
     try {
-      const data = await api.request('GET', `/executions?limit=50`);
-      const rows = (data?.data || []).map((e, i) => normalizeExecution(e, i));
-      setRuns(rows);
+      const res = await api.listTestRuns(projectId);
+      const base = res?.data || [];
+      const withStats = await Promise.all(base.map(async (r) => {
+        try {
+          const s = await api.getTestRunStats(projectId, r.id);
+          return { ...r, stats: s };
+        } catch { return { ...r, stats: { total: 0, executed: 0, progress: 0, byStatus: {} } }; }
+      }));
+      setRuns(withStats);
     } catch (err) {
       setError(err.message || 'Failed to load runs');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [projectId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -131,8 +95,8 @@ export default function TestRunsPage() {
   }, [tab]);
 
   const byTab = useMemo(() => {
-    const active = runs.filter((r) => r.status === 'running' || r.status === 'in_progress' || r.status === 'queued');
-    const closed = runs.filter((r) => r.status === 'passed' || r.status === 'failed' || r.status === 'complete');
+    const active = runs.filter((r) => r.state === 'new' || r.state === 'in_progress');
+    const closed = runs.filter((r) => r.state === 'completed' || r.state === 'closed');
     return { active, closed };
   }, [runs]);
 
@@ -140,7 +104,7 @@ export default function TestRunsPage() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return currentSet;
-    return currentSet.filter((r) => (r.name + ' ' + r.code + ' ' + r.assignee).toLowerCase().includes(q));
+    return currentSet.filter((r) => (`${r.name} TR-${r.id} ${r.assigneeName || ''} ${(r.tags || []).join(' ')}`).toLowerCase().includes(q));
   }, [currentSet, query]);
 
   return (
@@ -154,8 +118,7 @@ export default function TestRunsPage() {
         <div className="flex items-center gap-2" ref={createMenuRef}>
           <div className="relative inline-flex">
             <button className="btn-primary rounded-r-none" onClick={() => {
-              const pid = getCurrentProjectId();
-              navigate(pid ? `/projects/${pid}/test-runs/new` : '/projects');
+              navigate(projectId ? `/projects/${projectId}/test-runs/new` : '/projects');
             }}>
               <Plus size={16} /> Create Manual Run
             </button>
@@ -171,8 +134,7 @@ export default function TestRunsPage() {
                 <button
                   onClick={() => {
                     setCreateMenuOpen(false);
-                    const pid = getCurrentProjectId();
-                    navigate(pid ? `/projects/${pid}/test-runs/new` : '/projects');
+                    navigate(projectId ? `/projects/${projectId}/test-runs/new` : '/projects');
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-surface-50 flex items-start gap-2"
                 >
@@ -245,9 +207,17 @@ export default function TestRunsPage() {
         <div role="alert" className="bg-red-50 text-red-700 text-sm px-4 py-2 rounded-lg border border-red-200 mb-4">{error}</div>
       )}
 
+      {!projectId && (
+        <div className="empty py-16">
+          <p className="text-surface-700 font-medium mb-2">Select a project first</p>
+          <Link to="/projects" className="btn-primary btn-sm">Go to Projects</Link>
+        </div>
+      )}
+
       {/* Table */}
+      {projectId && (
       <div className="card overflow-hidden">
-        <div className="grid grid-cols-[minmax(0,1fr)_90px_100px_200px_160px_40px] gap-3 px-5 py-3 bg-surface-100/60 border-b border-surface-200/70 text-[11px] font-semibold uppercase tracking-wider text-surface-500">
+        <div className="grid grid-cols-[minmax(0,1fr)_90px_100px_220px_160px_40px] gap-3 px-5 py-3 bg-surface-100/60 border-b border-surface-200/70 text-[11px] font-semibold uppercase tracking-wider text-surface-500">
           <div>Runs</div>
           <div>Tests</div>
           <div>Duration</div>
@@ -259,7 +229,7 @@ export default function TestRunsPage() {
         {loading && (
           <div className="divide-y divide-surface-100">
             {[1,2,3,4].map((i) => (
-              <div key={i} className="px-5 py-4 grid grid-cols-[minmax(0,1fr)_90px_100px_200px_160px_40px] gap-3 items-center">
+              <div key={i} className="px-5 py-4 grid grid-cols-[minmax(0,1fr)_90px_100px_220px_160px_40px] gap-3 items-center">
                 <div className="flex items-center gap-3">
                   <div className="skeleton w-10 h-10 rounded-full" />
                   <div className="flex-1 space-y-2">
@@ -293,71 +263,61 @@ export default function TestRunsPage() {
             </p>
             <button
               className="btn-primary btn-sm"
-              onClick={() => {
-                const pid = getCurrentProjectId();
-                navigate(pid ? `/projects/${pid}/test-runs/new` : '/projects');
-              }}
+              onClick={() => navigate(`/projects/${projectId}/test-runs/new`)}
             ><Plus size={14} /> Create Manual Run</button>
           </div>
         )}
 
         {!loading && visible.length > 0 && (
           <div className="divide-y divide-surface-100 bg-white">
-            {visible.map((r) => (
-              <Link
-                key={r.id}
-                to={`/executions/${r.id}`}
-                className="grid grid-cols-[minmax(0,1fr)_90px_100px_200px_160px_40px] gap-3 px-5 py-4 items-center hover:bg-surface-50 transition-colors group"
-              >
-                {/* Runs column */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <RunStatusGlyph status={r.status} percent={r.percent ?? 0} />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-surface-900 truncate">{r.name}</span>
-                      <span className="text-xs font-mono text-surface-400 shrink-0">{r.code}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5 text-xs text-surface-500">
-                      <User size={11} /><span className="truncate">Assigned to {r.assignee}</span>
-                      {r.createdAt && <>
-                        <span>·</span><span>{formatDate(r.createdAt)}</span>
-                      </>}
+            {visible.map((r) => {
+              const s = r.stats || { total: 0, byStatus: {}, progress: 0 };
+              const by = s.byStatus || {};
+              return (
+                <Link
+                  key={r.id}
+                  to={`/projects/${projectId}/test-runs/${r.id}`}
+                  className="grid grid-cols-[minmax(0,1fr)_90px_100px_220px_160px_40px] gap-3 px-5 py-4 items-center hover:bg-surface-50 transition-colors group"
+                >
+                  {/* Runs */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <RunStatusGlyph state={r.state} progress={s.progress} />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-surface-900 truncate">{r.name}</span>
+                        <span className="text-xs font-mono text-surface-400 shrink-0">TR-{r.id}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5 text-xs text-surface-500">
+                        <User size={11} /><span className="truncate">Assigned to {r.assigneeName || r.assigneeEmail || '—'}</span>
+                        {r.createdAt && <><span>·</span><span>{formatDate(r.createdAt)}</span></>}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Tests count */}
-                <div className="text-sm text-surface-700">{r.tests} Tests</div>
+                  <div className="text-sm text-surface-700">{s.total} Tests</div>
+                  <div className="text-sm text-surface-700">{formatDuration(r.startedAt, r.completedAt)}</div>
 
-                {/* Duration */}
-                <div className="text-sm text-surface-700">{formatDuration(r.durationMs)}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center justify-center w-10 h-7 rounded bg-emerald-50 text-emerald-700 text-xs font-semibold ring-1 ring-inset ring-emerald-200/70">{by.passed || 0}</span>
+                    <span className="inline-flex items-center justify-center w-10 h-7 rounded bg-red-50 text-red-700 text-xs font-semibold ring-1 ring-inset ring-red-200/70">{by.failed || 0}</span>
+                    <span className="inline-flex items-center justify-center w-10 h-7 rounded bg-amber-50 text-amber-700 text-xs font-semibold ring-1 ring-inset ring-amber-200/70">{by.blocked || 0}</span>
+                    <span className="inline-flex items-center justify-center w-10 h-7 rounded bg-surface-50 text-surface-600 text-xs font-semibold ring-1 ring-inset ring-surface-200">{by.untested || 0}</span>
+                  </div>
 
-                {/* Status counts — 4 pills like the screenshot */}
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-flex items-center justify-center w-10 h-7 rounded bg-emerald-50 text-emerald-700 text-xs font-semibold ring-1 ring-inset ring-emerald-200/70">{r.passed}</span>
-                  <span className="inline-flex items-center justify-center w-10 h-7 rounded bg-red-50 text-red-700 text-xs font-semibold ring-1 ring-inset ring-red-200/70">{r.failed}</span>
-                  <span className="inline-flex items-center justify-center w-10 h-7 rounded bg-surface-50 text-surface-600 text-xs font-semibold ring-1 ring-inset ring-surface-200">{r.blocked}</span>
-                  <span className="inline-flex items-center justify-center w-10 h-7 rounded bg-surface-50 text-surface-600 text-xs font-semibold ring-1 ring-inset ring-surface-200">{r.untested}</span>
-                </div>
+                  <div className="text-sm text-surface-400">—</div>
 
-                {/* Failure analysis placeholder */}
-                <div className="text-sm text-surface-400">—</div>
-
-                {/* Overflow */}
-                <div className="flex justify-end">
-                  <button
-                    onClick={(e) => { e.preventDefault(); }}
-                    className="icon-btn opacity-0 group-hover:opacity-100 transition-opacity"
-                    aria-label="Run options"
-                  >
-                    <MoreHorizontal size={14} />
-                  </button>
-                </div>
-              </Link>
-            ))}
+                  <div className="flex justify-end">
+                    <button onClick={(e) => e.preventDefault()} className="icon-btn opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Run options">
+                      <MoreHorizontal size={14} />
+                    </button>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
