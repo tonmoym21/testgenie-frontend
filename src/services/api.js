@@ -248,6 +248,12 @@ class ApiService {
   async updateFolder(projectId, folderId, data) { return this.request('PATCH', `/projects/${projectId}/folders/${folderId}`, data); }
   async deleteFolder(projectId, folderId) { return this.request('DELETE', `/projects/${projectId}/folders/${folderId}`); }
 
+  // ── Project Insights ──────────────────────────────────────────────────────
+  async getProjectInsights(projectId, params = {}) {
+    const q = new URLSearchParams(params).toString();
+    return this.request('GET', `/projects/${projectId}/insights${q ? '?' + q : ''}`);
+  }
+
   // ── Test Runs ─────────────────────────────────────────────────────────────
   async listTestRuns(projectId, params = {}) { const q = new URLSearchParams(params).toString(); return this.request('GET', `/projects/${projectId}/test-runs${q ? '?' + q : ''}`); }
   async getTestRun(projectId, id) { return this.request('GET', `/projects/${projectId}/test-runs/${id}`); }
