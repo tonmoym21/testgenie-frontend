@@ -155,12 +155,19 @@ export default function Layout({ children }) {
 
   const groups = useMemo(() => NAV_GROUPS, []);
 
-  // Resolve the currently-opened project from either the URL or localStorage.
+  // Resolve the currently-opened project from the URL. Child nav items under
+  // Projects are only enabled while the user is actually inside a project
+  // (`/projects/:id/...`) — not just because a project was opened earlier in
+  // the session. localStorage is kept as a soft hint (e.g. to preselect the
+  // project when navigating to top-level aliases like /test-cases), but it
+  // does NOT enable the sidebar children.
   const projectMatch = pathname.match(/^\/projects\/([^/]+)/);
   const urlProjectId = projectMatch ? projectMatch[1] : null;
   const storedProjectId = (() => { try { return getCurrentProjectId(); } catch { return null; } })();
-  const activeProjectId = urlProjectId || storedProjectId;
-  const isInsideProject = !!activeProjectId;
+  const activeProjectId = urlProjectId;
+  const isInsideProject = !!urlProjectId;
+  // Keep the stored id referenced for other call sites that read it elsewhere.
+  void storedProjectId;
 
   // Projects parent is "active" when anywhere under /projects (or the old
   // project-scoped aliases).

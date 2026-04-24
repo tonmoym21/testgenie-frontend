@@ -101,7 +101,7 @@ export default function ProjectTestCasesPage() {
   const [error, setError] = useState('');
 
   // Selection in tree: 'all' | 'none' | <folderId>
-  const [selectedFolder, setSelectedFolder] = useState('all');
+  const [selectedFolder, setSelectedFolder] = useState(null);
   const [expanded, setExpanded] = useState(() => new Set());
   const [query, setQuery] = useState('');
 
@@ -198,8 +198,7 @@ export default function ProjectTestCasesPage() {
 
   const visibleTestCases = useMemo(() => {
     let list = testCases;
-    if (selectedFolder === 'none') list = list.filter((tc) => tc.folderId == null);
-    else if (selectedFolder !== 'all') {
+    if (typeof selectedFolder === 'number') {
       // include descendants of the selected folder
       const ids = new Set([Number(selectedFolder)]);
       let grew = true;
@@ -239,7 +238,7 @@ export default function ProjectTestCasesPage() {
       await api.deleteFolder(projectId, folder.id);
       setFolders((prev) => prev.filter((f) => f.id !== folder.id && f.parentId !== folder.id));
       setTestCases((prev) => prev.map((tc) => tc.folderId === folder.id ? { ...tc, folderId: null } : tc));
-      if (selectedFolder === folder.id) setSelectedFolder('all');
+      if (selectedFolder === folder.id) setSelectedFolder(null);
     } catch (err) { setError(err.message); }
   };
 
@@ -587,22 +586,6 @@ export default function ProjectTestCasesPage() {
             </button>
           </div>
           <div className="py-2">
-            <button
-              onClick={() => setSelectedFolder('all')}
-              className={`w-full flex items-center gap-2 px-4 py-1.5 text-sm ${selectedFolder === 'all' ? 'bg-brand-50 text-brand-800 font-medium' : 'text-surface-700 hover:bg-surface-100'}`}
-            >
-              <Folder size={14} className="text-surface-400" />
-              <span className="flex-1 text-left">All test cases</span>
-              <span className="text-[11px] text-surface-400 tabular-nums">{testCases.length}</span>
-            </button>
-            <button
-              onClick={() => setSelectedFolder('none')}
-              className={`w-full flex items-center gap-2 px-4 py-1.5 text-sm ${selectedFolder === 'none' ? 'bg-brand-50 text-brand-800 font-medium' : 'text-surface-700 hover:bg-surface-100'}`}
-            >
-              <Folder size={14} className="text-surface-400" />
-              <span className="flex-1 text-left">Unassigned</span>
-              <span className="text-[11px] text-surface-400 tabular-nums">{testCases.filter((tc) => tc.folderId == null).length}</span>
-            </button>
             <div className="px-1 pt-1">
               {tree.length === 0 ? (
                 <p className="text-xs text-surface-400 px-3 py-4 italic">
@@ -699,9 +682,9 @@ export default function ProjectTestCasesPage() {
               <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4"><Shield size={24} /></div>
               <h3 className="text-lg font-semibold text-surface-800 mb-1">No test cases here</h3>
               <p className="text-surface-500 text-sm mb-6 max-w-xs">
-                {selectedFolder === 'all'
-                  ? 'Start by creating your first test case or importing from a story or API collection.'
-                  : 'This folder is empty. Create a test case or move one in from another folder.'}
+                {typeof selectedFolder === 'number'
+                  ? 'This folder is empty. Create a test case or move one in from another folder.'
+                  : 'Start by creating your first test case or importing from a story or API collection.'}
               </p>
               <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm"><Plus size={14} /> Create Test Case</button>
             </div>
