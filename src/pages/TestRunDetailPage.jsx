@@ -117,12 +117,13 @@ function useClickOutside(onClose) {
   return ref;
 }
 
-function AddCasesModal({ projectId, existingIds, onClose, onAdded }) {
+function AddCasesModal({ projectId, existingIds, folders = [], onClose, onAdded }) {
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState(() => new Set());
   const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState(() => new Set());
 
   useEffect(() => {
     (async () => {
@@ -134,24 +135,172 @@ function AddCasesModal({ projectId, existingIds, onClose, onAdded }) {
   }, [projectId]);
 
   const existing = useMemo(() => new Set((existingIds || []).map(Number)), [existingIds]);
-  const filtered = useMemo(() => {
+
+  // Build folder tree (parentId -> children) and index cases by folderId
+  const { tree, casesByFolder, uncategorized } = useMemo(() => {
+    const byParent = new Map();
+    const folderById = new Map();
+    for (const f of folders) {
+      folderById.set(f.id, f);
+      const k = f.parentId ?? null;
+      if (!byParent.has(k)) byParent.set(k, []);
+      byParent.get(k).push(f);
+    }
+    const walk = (parentId) => (byParent.get(parentId) || []).map((f) => ({ ...f, children: walk(f.id) }));
+    const roots = walk(null);
+
+    const caseMap = new Map();
+    const uncat = [];
+    const addable = cases.filter((c) => !existing.has(c.id));
+    for (const c of addable) {
+      const fid = c.folderId || null;
+      if (!fid || !folderById.has(fid)) { uncat.push(c); continue; }
+      if (!caseMap.has(fid)) caseMap.set(fid, []);
+      caseMap.get(fid).push(c);
+    }
+    return { tree: roots, casesByFolder: caseMap, uncategorized: uncat };
+  }, [folders, cases, existing]);
+
+  // Collect all descendant case ids for a folder (recursive)
+  const collectDescendantCaseIds = (node) => {
+    const ids = new Set();
+    const own = casesByFolder.get(node.id) || [];
+    for (const c of own) ids.add(c.id);
+    for (const child of node.children) {
+      for (const id of collectDescendantCaseIds(child)) ids.add(id);
+    }
+    return ids;
+  };
+
+  const matchesSearch = (c) => {
     const t = q.trim().toLowerCase();
-    return cases.filter((c) => !existing.has(c.id) && (!t || c.title.toLowerCase().includes(t)));
-  }, [cases, q, existing]);
+    if (!t) return true;
+    return c.title.toLowerCase().includes(t);
+  };
+
+  const folderMatchesSearch = (node) => {
+    const t = q.trim().toLowerCase();
+    if (!t) return true;
+    if (node.name.toLowerCase().includes(t)) return true;
+    const own = (casesByFolder.get(node.id) || []).some(matchesSearch);
+    if (own) return true;
+    return node.children.some(folderMatchesSearch);
+  };
 
   const toggle = (id) => setSelected((prev) => {
     const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
   });
+  const toggleFolder = (node) => setSelected((prev) => {
+    const ids = collectDescendantCaseIds(node);
+    const allSelected = [...ids].every((id) => prev.has(id));
+    const n = new Set(prev);
+    if (allSelected) { for (const id of ids) n.delete(id); }
+    else { for (const id of ids) n.add(id); }
+    return n;
+  });
+  const toggleExpand = (id) => setExpanded((prev) => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+
+  const allVisibleIds = useMemo(() => {
+    const ids = [];
+    const walk = (nodes) => {
+      for (const n of nodes) {
+        if (!folderMatchesSearch(n)) continue;
+        for (const c of (casesByFolder.get(n.id) || [])) { if (matchesSearch(c)) ids.push(c.id); }
+        walk(n.children);
+      }
+    };
+    walk(tree);
+    for (const c of uncategorized) { if (matchesSearch(c)) ids.push(c.id); }
+    return ids;
+  }, [tree, casesByFolder, uncategorized, q]);
+
   const toggleAll = () => {
-    if (selected.size === filtered.length) setSelected(new Set());
-    else setSelected(new Set(filtered.map((c) => c.id)));
+    if (allVisibleIds.every((id) => selected.has(id))) {
+      setSelected((prev) => { const n = new Set(prev); for (const id of allVisibleIds) n.delete(id); return n; });
+    } else {
+      setSelected((prev) => { const n = new Set(prev); for (const id of allVisibleIds) n.add(id); return n; });
+    }
   };
+
   const handleAdd = async () => {
     if (selected.size === 0) return;
     setSaving(true);
     try { await onAdded(Array.from(selected)); onClose(); }
     finally { setSaving(false); }
   };
+
+  const selectedFolderCount = useMemo(() => {
+    let count = 0;
+    const check = (node) => {
+      const ids = collectDescendantCaseIds(node);
+      if (ids.size > 0 && [...ids].some((id) => selected.has(id))) count++;
+      for (const child of node.children) check(child);
+    };
+    tree.forEach(check);
+    if (uncategorized.some((c) => selected.has(c.id))) count++;
+    return count;
+  }, [tree, uncategorized, selected]);
+
+  function FolderRow({ node, depth }) {
+    if (!folderMatchesSearch(node)) return null;
+    const own = (casesByFolder.get(node.id) || []).filter(matchesSearch);
+    const descIds = collectDescendantCaseIds(node);
+    const selCount = [...descIds].filter((id) => selected.has(id)).length;
+    const allSelected = descIds.size > 0 && selCount === descIds.size;
+    const someSelected = selCount > 0 && !allSelected;
+    const isOpen = expanded.has(node.id) || !!q.trim();
+    const hasContent = own.length > 0 || node.children.some(folderMatchesSearch);
+
+    return (
+      <div>
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 hover:bg-surface-50 cursor-pointer text-sm"
+          style={{ paddingLeft: 12 + depth * 16 }}
+          onClick={() => toggleExpand(node.id)}
+        >
+          <input
+            type="checkbox"
+            checked={allSelected}
+            ref={(el) => { if (el) el.indeterminate = someSelected; }}
+            onClick={(e) => e.stopPropagation()}
+            onChange={() => toggleFolder(node)}
+            disabled={descIds.size === 0}
+          />
+          <button
+            type="button"
+            className="w-4 h-4 flex items-center justify-center text-surface-500 shrink-0"
+            onClick={(e) => { e.stopPropagation(); toggleExpand(node.id); }}
+          >
+            {hasContent ? (isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />) : <span className="w-3" />}
+          </button>
+          {isOpen && hasContent
+            ? <FolderOpen size={14} className="text-amber-500 shrink-0" />
+            : <Folder size={14} className="text-amber-500 shrink-0" />}
+          <span className="truncate flex-1 font-medium text-surface-800">{node.name}</span>
+          <span className="text-xs text-surface-500 tabular-nums">{descIds.size}</span>
+        </div>
+        {isOpen && (
+          <>
+            {own.map((c) => (
+              <label
+                key={c.id}
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-surface-50 cursor-pointer text-sm"
+                style={{ paddingLeft: 36 + depth * 16 }}
+              >
+                <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} />
+                <span className="text-xs font-mono text-surface-500 shrink-0">TC-{c.id}</span>
+                <span className="text-sm text-surface-800 truncate flex-1">{c.title}</span>
+                <span className="text-[11px] text-surface-500 capitalize">{c.priority}</span>
+              </label>
+            ))}
+            {node.children.map((child) => <FolderRow key={child.id} node={child} depth={depth + 1} />)}
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -163,41 +312,81 @@ function AddCasesModal({ projectId, existingIds, onClose, onAdded }) {
         <div className="px-6 py-3 border-b border-surface-200/70">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search test cases" className="input pl-9 py-1.5 text-sm" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search folders and test cases" className="input pl-9 py-1.5 text-sm" />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="p-6 text-center text-surface-500"><Loader2 className="inline animate-spin mr-2" size={14}/>Loading…</div>
-          ) : filtered.length === 0 ? (
+          ) : allVisibleIds.length === 0 ? (
             <div className="p-6 text-center text-sm text-surface-500">No test cases available{q ? ' for that search' : ''}.</div>
           ) : (
             <>
-              <div className="px-4 py-2 bg-surface-50 border-b border-surface-200/70 flex items-center gap-2 text-xs text-surface-600">
-                <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={toggleAll} />
-                <span>Select all ({filtered.length})</span>
+              <div className="px-4 py-2 bg-surface-50 border-b border-surface-200/70 flex items-center gap-2 text-xs text-surface-600 sticky top-0 z-10">
+                <input
+                  type="checkbox"
+                  checked={allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id))}
+                  onChange={toggleAll}
+                />
+                <span>Select all ({allVisibleIds.length})</span>
                 <span className="ml-auto">{selected.size} selected</span>
               </div>
-              <ul className="divide-y divide-surface-200/70">
-                {filtered.map((c) => (
-                  <li key={c.id}>
-                    <label className="flex items-center gap-3 px-4 py-2 hover:bg-surface-50 cursor-pointer">
-                      <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} />
-                      <span className="text-xs font-mono text-surface-500 shrink-0">TC-{c.id}</span>
-                      <span className="text-sm text-surface-800 truncate flex-1">{c.title}</span>
-                      <span className="text-[11px] text-surface-500 capitalize">{c.priority}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
+              <div className="py-1">
+                {tree.map((node) => <FolderRow key={node.id} node={node} depth={0} />)}
+                {uncategorized.filter(matchesSearch).length > 0 && (
+                  <div>
+                    <div
+                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-surface-50 cursor-pointer text-sm"
+                      onClick={() => toggleExpand('uncat')}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={uncategorized.length > 0 && uncategorized.every((c) => selected.has(c.id))}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => setSelected((prev) => {
+                          const ids = uncategorized.map((c) => c.id);
+                          const all = ids.every((id) => prev.has(id));
+                          const n = new Set(prev);
+                          if (all) ids.forEach((id) => n.delete(id));
+                          else ids.forEach((id) => n.add(id));
+                          return n;
+                        })}
+                      />
+                      <span className="w-4 h-4 flex items-center justify-center text-surface-500 shrink-0">
+                        {expanded.has('uncat') || q.trim() ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      </span>
+                      <Folder size={14} className="text-surface-400 shrink-0" />
+                      <span className="truncate flex-1 italic text-surface-700">Uncategorized</span>
+                      <span className="text-xs text-surface-500 tabular-nums">{uncategorized.length}</span>
+                    </div>
+                    {(expanded.has('uncat') || q.trim()) && uncategorized.filter(matchesSearch).map((c) => (
+                      <label
+                        key={c.id}
+                        className="flex items-center gap-2 px-3 py-1.5 hover:bg-surface-50 cursor-pointer text-sm"
+                        style={{ paddingLeft: 36 }}
+                      >
+                        <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} />
+                        <span className="text-xs font-mono text-surface-500 shrink-0">TC-{c.id}</span>
+                        <span className="text-sm text-surface-800 truncate flex-1">{c.title}</span>
+                        <span className="text-[11px] text-surface-500 capitalize">{c.priority}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
-        <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-surface-200/70">
-          <button onClick={onClose} className="btn-secondary">Cancel</button>
-          <button onClick={handleAdd} disabled={selected.size === 0 || saving} className="btn-primary">
-            {saving && <Loader2 size={14} className="animate-spin" />} Add {selected.size || ''}
-          </button>
+        <div className="flex items-center justify-between gap-2 px-6 py-3 border-t border-surface-200/70">
+          <span className="text-xs text-surface-500">
+            {selected.size > 0 ? `${selected.size} case${selected.size === 1 ? '' : 's'} across ${selectedFolderCount} folder${selectedFolderCount === 1 ? '' : 's'}` : ''}
+          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="btn-secondary">Cancel</button>
+            <button onClick={handleAdd} disabled={selected.size === 0 || saving} className="btn-primary">
+              {saving && <Loader2 size={14} className="animate-spin" />} Add {selected.size || ''}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1115,6 +1304,7 @@ export default function TestRunDetailPage() {
         <AddCasesModal
           projectId={projectId}
           existingIds={run?.testCaseIds || []}
+          folders={folders}
           onClose={() => setShowAdd(false)}
           onAdded={handleAdd}
         />

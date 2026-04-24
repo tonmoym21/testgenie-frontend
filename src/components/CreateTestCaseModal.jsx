@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   X, Plus, Sparkles, Folder, GripVertical, Upload, Loader2,
-  Settings2, CheckSquare, Minus, FileText,
+  Settings2, CheckSquare, Minus, FileText, ExternalLink, Link2,
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -129,9 +129,72 @@ export default function CreateTestCaseModal({ folderName, onClose, onSubmit, edi
   const fileRef = useRef(null);
   const nextStepId = useRef((steps[steps.length - 1]?.id || 1) + 1);
 
+  // --- Jira requirements linking (bi-directional) ---
+  // Model only supports ONE jira_issue_key per case — render as array for future compatibility.
+  const initialJiraLinks = (isEdit && editingCase?.jiraIssueKey)
+    ? [{ key: editingCase.jiraIssueKey, summary: editingCase.jiraIssueSummary || '' }]
+    : [];
+  const [jiraLinks, setJiraLinks] = useState(initialJiraLinks);
+  const [jiraKeyInput, setJiraKeyInput] = useState('');
+  const [jiraSummaryInput, setJiraSummaryInput] = useState('');
+  const [jiraBusy, setJiraBusy] = useState(false);
+  const [jiraBaseUrl, setJiraBaseUrl] = useState('');
+
   useEffect(() => {
     api.listAssignableMembers().then((r) => setMembers(r?.members || [])).catch(() => {});
+    // Try to fetch jira base URL for clickable chips (best-effort)
+    (async () => {
+      try {
+        const s = await (api.getJiraStatus ? api.getJiraStatus() : api.request?.('GET', '/jira/status'));
+        if (s?.jiraBaseUrl) setJiraBaseUrl(s.jiraBaseUrl);
+      } catch { /* ignore */ }
+    })();
   }, []);
+
+  const buildJiraUrl = (key) => {
+    if (!key) return null;
+    const base = (jiraBaseUrl || '').replace(/\/+$/, '');
+    return base ? `${base}/browse/${key}` : null;
+  };
+
+  const addJiraLink = async () => {
+    const key = jiraKeyInput.trim().toUpperCase();
+    const summary = jiraSummaryInput.trim();
+    if (!key) return;
+    if (jiraLinks.some((l) => l.key === key)) {
+      setJiraKeyInput(''); setJiraSummaryInput(''); return;
+    }
+    // Model limit: only one key per case
+    if (jiraLinks.length >= 1) return;
+    if (isEdit && editingCase?.id) {
+      setJiraBusy(true);
+      try {
+        await api.linkTestCaseToJira(projectId, editingCase.id, key, summary);
+        setJiraLinks([{ key, summary }]);
+        setJiraKeyInput(''); setJiraSummaryInput('');
+      } catch (err) {
+        setErrorMsg(err?.message || 'Failed to link Jira issue');
+      } finally { setJiraBusy(false); }
+    } else {
+      // Create mode: defer — apply after create
+      setJiraLinks([{ key, summary }]);
+      setJiraKeyInput(''); setJiraSummaryInput('');
+    }
+  };
+
+  const removeJiraLink = async (key) => {
+    if (isEdit && editingCase?.id) {
+      setJiraBusy(true);
+      try {
+        await api.unlinkTestCaseFromJira(projectId, editingCase.id);
+        setJiraLinks((prev) => prev.filter((l) => l.key !== key));
+      } catch (err) {
+        setErrorMsg(err?.message || 'Failed to unlink Jira issue');
+      } finally { setJiraBusy(false); }
+    } else {
+      setJiraLinks((prev) => prev.filter((l) => l.key !== key));
+    }
+  };
 
   const addStep = () => {
     setSteps((prev) => [...prev, { id: nextStepId.current++, step: '', result: '' }]);
@@ -518,15 +581,80 @@ export default function CreateTestCaseModal({ folderName, onClose, onSubmit, edi
                     <span className="w-2.5 h-2.5 rounded-sm bg-brand-500" /> Jira
                   </span>
                 </div>
-                <input
-                  value={requirements}
-                  onChange={(e) => setRequirements(e.target.value)}
-                  placeholder="Select options"
-                  className="input text-sm"
-                />
+
+                {/* Linked Jira chips */}
+                {jiraLinks.length > 0 && (
+                  <ul className="flex flex-wrap gap-1.5 mb-2">
+                    {jiraLinks.map((l) => {
+                      const url = buildJiraUrl(l.key);
+                      return (
+                        <li
+                          key={l.key}
+                          className="inline-flex items-center gap-1 bg-brand-50 border border-brand-100 text-brand-700 rounded px-1.5 py-0.5 text-xs max-w-full"
+                        >
+                          {url ? (
+                            <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-medium hover:underline">
+                              <Link2 size={10} /> {l.key}
+                              <ExternalLink size={9} />
+                            </a>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 font-medium"><Link2 size={10} /> {l.key}</span>
+                          )}
+                          {l.summary && (
+                            <span className="text-surface-600 truncate max-w-[140px]" title={l.summary}>— {l.summary}</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeJiraLink(l.key)}
+                            disabled={jiraBusy}
+                            className="ml-0.5 text-brand-700 hover:text-red-600 disabled:opacity-50"
+                            aria-label={`Unlink ${l.key}`}
+                          >
+                            <X size={10} />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+
+                {/* Add input — only if no link yet (schema supports only one key) */}
+                {jiraLinks.length === 0 ? (
+                  <>
+                    <div className="flex gap-1">
+                      <input
+                        value={jiraKeyInput}
+                        onChange={(e) => setJiraKeyInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addJiraLink(); } }}
+                        placeholder="PROJ-123"
+                        className="input text-sm flex-1 font-mono"
+                        disabled={jiraBusy}
+                      />
+                      <button
+                        type="button"
+                        onClick={addJiraLink}
+                        disabled={jiraBusy || !jiraKeyInput.trim()}
+                        className="btn-secondary btn-sm"
+                      >
+                        {jiraBusy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Add
+                      </button>
+                    </div>
+                    <input
+                      value={jiraSummaryInput}
+                      onChange={(e) => setJiraSummaryInput(e.target.value)}
+                      placeholder="Summary (optional)"
+                      className="input text-sm mt-1"
+                      disabled={jiraBusy}
+                    />
+                  </>
+                ) : (
+                  <p className="text-xs text-surface-500 italic">
+                    Only one Jira issue can be linked per test case. Unlink to swap.
+                  </p>
+                )}
+
                 <p className="text-xs text-surface-500 mt-1">
-                  To create new Jira requirements,{' '}
-                  <button type="button" className="text-brand-600 hover:underline">click here</button>
+                  Linking from Jira? Test cases attached here will also appear in the Jira story.
                 </p>
               </LabeledField>
 
