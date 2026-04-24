@@ -77,19 +77,8 @@ function ParentNavItem({ label, icon: Icon, active, expanded, onToggle, collapse
   );
 }
 
-function ChildNavItem({ to, label, icon: Icon, active, collapsed, disabled }) {
+function ChildNavItem({ to, label, icon: Icon, active, collapsed }) {
   const base = `group relative flex items-center gap-2.5 pl-9 pr-3 py-1.5 rounded-lg text-[13px] transition-all`;
-  if (disabled) {
-    return (
-      <div
-        title={collapsed ? label : 'Open a project first'}
-        className={`${base} text-surface-500/70 cursor-not-allowed`}
-      >
-        <Icon size={14} className="shrink-0 text-surface-600" />
-        {!collapsed && <span className="truncate">{label}</span>}
-      </div>
-    );
-  }
   return (
     <Link
       to={to}
@@ -164,10 +153,11 @@ export default function Layout({ children }) {
   const projectMatch = pathname.match(/^\/projects\/([^/]+)/);
   const urlProjectId = projectMatch ? projectMatch[1] : null;
   const storedProjectId = (() => { try { return getCurrentProjectId(); } catch { return null; } })();
-  const activeProjectId = urlProjectId;
+  // Prefer the URL project id so the sidebar reflects the currently-open
+  // project, but fall back to the last-opened project so child sections stay
+  // navigable even when the user is on a top-level page.
+  const activeProjectId = urlProjectId || storedProjectId;
   const isInsideProject = !!urlProjectId;
-  // Keep the stored id referenced for other call sites that read it elsewhere.
-  void storedProjectId;
 
   // Projects parent is "active" when anywhere under /projects (or the old
   // project-scoped aliases).
@@ -256,14 +246,8 @@ export default function Layout({ children }) {
                                 icon={c.icon}
                                 active={isChildActive(c.sub)}
                                 collapsed={collapsed}
-                                disabled={!activeProjectId}
                               />
                             ))}
-                            {!activeProjectId && (
-                              <div className="pl-9 pr-3 pt-1 text-[11px] text-surface-500">
-                                Open a project to enable
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>

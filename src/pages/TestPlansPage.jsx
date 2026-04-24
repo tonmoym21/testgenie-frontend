@@ -1,8 +1,12 @@
+import { useParams } from 'react-router-dom';
 import { BookOpen } from 'lucide-react';
+import BackButton from '../components/BackButton';
 
 export default function TestPlansPage() {
+  const { projectId } = useParams();
   return (
     <div className="page">
+      {projectId && <BackButton to="/projects" label="Back to projects" />}
       <div className="page-header">
         <div>
           <h1 className="page-title">Test Plans</h1>

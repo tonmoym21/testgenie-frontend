@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { setCurrentProjectId } from '../utils/currentProject';
+import BackButton from '../components/BackButton';
 
 const TIME_RANGES = [
   { id: '1d',  label: '1D' },
@@ -279,6 +280,7 @@ export default function InsightsPage() {
 
   return (
     <div className="page">
+      <BackButton to="/projects" label="Back to projects" />
       {/* Header */}
       <div className="page-header">
         <div className="min-w-0">

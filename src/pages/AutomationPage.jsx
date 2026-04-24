@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { Loader2, Play, Package, Search, CheckCircle, XCircle, Clock, ShieldCheck, AlertTriangle } from 'lucide-react';
+import BackButton from '../components/BackButton';
 
 const CATEGORY_OPTIONS = ['smoke', 'sanity', 'regression', 'e2e', 'critical_path', 'ui', 'api', 'p0', 'p1', 'p2'];
 
@@ -117,6 +118,7 @@ export default function AutomationPage() {
 
   return (
     <div className="page">
+      {urlProjectId && <BackButton to="/projects" label="Back to projects" />}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold">Automation Library</h1>

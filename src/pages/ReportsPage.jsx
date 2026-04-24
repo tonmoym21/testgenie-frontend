@@ -1,9 +1,12 @@
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { FileText, BarChart3, Play } from 'lucide-react';
+import BackButton from '../components/BackButton';
 
 export default function ReportsPage() {
+  const { projectId } = useParams();
   return (
     <div className="page">
+      {projectId && <BackButton to="/projects" label="Back to projects" />}
       <div className="page-header">
         <div>
           <h1 className="page-title">Reports</h1>

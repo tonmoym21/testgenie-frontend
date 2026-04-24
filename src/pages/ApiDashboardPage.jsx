@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
+import BackButton from '../components/BackButton';
 import { 
   Globe, Loader2, TrendingUp, TrendingDown, Clock, CheckCircle, 
   XCircle, AlertTriangle, Activity, Zap, BarChart3, ArrowRight,
@@ -190,6 +191,7 @@ export default function ApiDashboardPage() {
 
   return (
     <div className="page max-w-none">
+      <BackButton to="/dashboard" label="Back to Dashboard" />
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
