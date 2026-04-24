@@ -4,21 +4,28 @@ import { useAuth } from '../context/AuthContext';
 import {
   Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings,
   Clock, Bot, Users, Search, ChevronsLeft, ChevronsRight, ChevronDown,
-  Sparkles, HelpCircle, FileText, ClipboardList, Puzzle, BookOpen,
+  ChevronRight, Sparkles, HelpCircle, FileText, ClipboardList, Puzzle,
+  BookOpen, Activity,
 } from 'lucide-react';
+import { getCurrentProjectId } from '../utils/currentProject';
 
-// BrowserStack-style IA — single flat list like the reference screenshot.
-// `match` extends active highlighting to project-scoped sub-paths.
+// Projects is a parent module. Its 5 children are revealed when a project
+// is opened (URL `/projects/:id/...` or a project has been selected before).
+const PROJECT_CHILDREN = [
+  { key: 'insights',   label: 'Insights',   icon: Activity,      sub: 'insights' },
+  { key: 'test-cases', label: 'Test Cases', icon: ClipboardList, sub: 'test-cases' },
+  { key: 'test-runs',  label: 'Test Runs',  icon: Play,          sub: 'test-runs' },
+  { key: 'test-plans', label: 'Test Plans', icon: BookOpen,      sub: 'test-plans' },
+  { key: 'reports',    label: 'Reports',    icon: FileText,      sub: 'reports' },
+];
+
 const NAV_GROUPS = [
   {
     label: null,
     items: [
       { path: '/dashboard', label: 'Dashboards', icon: BarChart3, match: ['/dashboard'] },
-      { path: '/reports', label: 'Reports', icon: FileText, match: ['/reports'] },
-      { path: '/projects', label: 'Projects', icon: FolderOpen, match: ['/projects'] },
-      { path: '/test-cases', label: 'Test Cases', icon: ClipboardList, match: ['/test-cases', '/projects/:id/test-cases'] },
-      { path: '/test-runs', label: 'Test Runs', icon: Play, match: ['/test-runs', '/executions'] },
-      { path: '/test-plans', label: 'Test Plans', icon: BookOpen, match: ['/test-plans'] },
+      { key: 'projects', label: 'Projects', icon: FolderOpen, parent: true,
+        match: ['/projects', '/test-cases', '/test-runs', '/test-plans', '/reports', '/executions'] },
       { path: '/integrations', label: 'Integrations', icon: Puzzle, match: ['/integrations', '/jira'] },
       { path: '/settings', label: 'Settings', icon: Settings, match: ['/settings', '/team', '/environments', '/globals'] },
     ],
@@ -38,6 +45,50 @@ function NavItem({ to, label, icon: Icon, active, collapsed }) {
     >
       {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-gradient-to-b from-brand-400 to-brand-600" />}
       <Icon size={18} className={`shrink-0 ${active ? 'text-brand-300' : 'text-surface-400 group-hover:text-white'}`} />
+      {!collapsed && <span className="truncate">{label}</span>}
+    </Link>
+  );
+}
+
+function ParentNavItem({ label, icon: Icon, active, expanded, onToggle, collapsed }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={collapsed ? label : undefined}
+      aria-expanded={expanded}
+      className={`group relative w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all
+        ${active
+          ? 'bg-white/10 text-white shadow-inner ring-1 ring-white/10'
+          : 'text-surface-300 hover:bg-white/5 hover:text-white'}`}
+    >
+      {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-gradient-to-b from-brand-400 to-brand-600" />}
+      <Icon size={18} className={`shrink-0 ${active ? 'text-brand-300' : 'text-surface-400 group-hover:text-white'}`} />
+      {!collapsed && (
+        <>
+          <span className="truncate flex-1 text-left">{label}</span>
+          <ChevronRight
+            size={14}
+            className={`text-surface-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
+          />
+        </>
+      )}
+    </button>
+  );
+}
+
+function ChildNavItem({ to, label, icon: Icon, active, collapsed }) {
+  return (
+    <Link
+      to={to}
+      title={collapsed ? label : undefined}
+      aria-current={active ? 'page' : undefined}
+      className={`group relative flex items-center gap-2.5 pl-9 pr-3 py-1.5 rounded-lg text-[13px] transition-all
+        ${active
+          ? 'bg-white/10 text-white ring-1 ring-white/10'
+          : 'text-surface-400 hover:bg-white/5 hover:text-white'}`}
+    >
+      <Icon size={14} className={`shrink-0 ${active ? 'text-brand-300' : 'text-surface-500 group-hover:text-white'}`} />
       {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
@@ -92,6 +143,31 @@ export default function Layout({ children }) {
 
   const groups = useMemo(() => NAV_GROUPS, []);
 
+  // Resolve the currently-opened project from either the URL or localStorage.
+  const projectMatch = pathname.match(/^\/projects\/([^/]+)/);
+  const urlProjectId = projectMatch ? projectMatch[1] : null;
+  const storedProjectId = (() => { try { return getCurrentProjectId(); } catch { return null; } })();
+  const activeProjectId = urlProjectId || storedProjectId;
+  const isInsideProject = !!activeProjectId;
+
+  // Projects parent is "active" when anywhere under /projects (or the old
+  // project-scoped aliases).
+  const projectsActive = isActive({ match: ['/projects'] });
+
+  const [projectsExpanded, setProjectsExpanded] = useState(() => projectsActive || isInsideProject);
+  useEffect(() => {
+    if (projectsActive || isInsideProject) setProjectsExpanded(true);
+  }, [projectsActive, isInsideProject]);
+
+  const isChildActive = (sub) => {
+    if (!activeProjectId) return false;
+    const base = `/projects/${activeProjectId}`;
+    if (sub === 'insights') {
+      return pathname === base || pathname === `${base}/insights`;
+    }
+    return pathname.startsWith(`${base}/${sub}`);
+  };
+
   const initial = (user?.email || '?').charAt(0).toUpperCase();
   const sidebarW = collapsed ? 'w-[72px]' : 'w-64';
 
@@ -126,16 +202,59 @@ export default function Layout({ children }) {
                 </div>
               )}
               <div className="space-y-0.5">
-                {group.items.map((item) => (
-                  <NavItem
-                    key={item.path}
-                    to={item.path}
-                    label={item.label}
-                    icon={item.icon}
-                    active={isActive(item)}
-                    collapsed={collapsed}
-                  />
-                ))}
+                {group.items.map((item) => {
+                  if (item.parent && item.key === 'projects') {
+                    return (
+                      <div key="projects">
+                        <ParentNavItem
+                          label={item.label}
+                          icon={item.icon}
+                          active={projectsActive}
+                          expanded={projectsExpanded && !collapsed}
+                          onToggle={() => {
+                            if (collapsed) {
+                              navigate('/projects');
+                            } else {
+                              setProjectsExpanded((v) => !v);
+                            }
+                          }}
+                          collapsed={collapsed}
+                        />
+                        {!collapsed && projectsExpanded && (
+                          <div className="mt-0.5 space-y-0.5">
+                            <ChildNavItem
+                              to="/projects"
+                              label="All Projects"
+                              icon={FolderOpen}
+                              active={pathname === '/projects'}
+                              collapsed={collapsed}
+                            />
+                            {isInsideProject && PROJECT_CHILDREN.map((c) => (
+                              <ChildNavItem
+                                key={c.key}
+                                to={`/projects/${activeProjectId}/${c.sub}`}
+                                label={c.label}
+                                icon={c.icon}
+                                active={isChildActive(c.sub)}
+                                collapsed={collapsed}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <NavItem
+                      key={item.path}
+                      to={item.path}
+                      label={item.label}
+                      icon={item.icon}
+                      active={isActive(item)}
+                      collapsed={collapsed}
+                    />
+                  );
+                })}
               </div>
             </div>
           ))}

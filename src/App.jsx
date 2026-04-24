@@ -33,6 +33,7 @@ import TestCasesRedirect from './pages/TestCasesRedirect';
 import TestRunsPage from './pages/TestRunsPage';
 import CreateTestRunPage from './pages/CreateTestRunPage';
 import TestRunDetailPage from './pages/TestRunDetailPage';
+import InsightsPage from './pages/InsightsPage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -64,8 +65,11 @@ export default function App() {
 
       {/* Projects */}
       <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
-      <Route path="/projects/:projectId" element={<ProtectedRoute><ProjectTestCasesPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId" element={<ProtectedRoute><InsightsPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/insights" element={<ProtectedRoute><InsightsPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/test-cases" element={<ProtectedRoute><ProjectTestCasesPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/test-plans" element={<ProtectedRoute><TestPlansPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/legacy" element={<ProtectedRoute><ProjectDetailPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/stories/new" element={<ProtectedRoute><CreateStoryPage /></ProtectedRoute>} />
