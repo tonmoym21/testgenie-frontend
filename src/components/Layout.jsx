@@ -77,13 +77,25 @@ function ParentNavItem({ label, icon: Icon, active, expanded, onToggle, collapse
   );
 }
 
-function ChildNavItem({ to, label, icon: Icon, active, collapsed }) {
+function ChildNavItem({ to, label, icon: Icon, active, collapsed, disabled }) {
+  const base = `group relative flex items-center gap-2.5 pl-9 pr-3 py-1.5 rounded-lg text-[13px] transition-all`;
+  if (disabled) {
+    return (
+      <div
+        title={collapsed ? label : 'Open a project first'}
+        className={`${base} text-surface-500/70 cursor-not-allowed`}
+      >
+        <Icon size={14} className="shrink-0 text-surface-600" />
+        {!collapsed && <span className="truncate">{label}</span>}
+      </div>
+    );
+  }
   return (
     <Link
       to={to}
       title={collapsed ? label : undefined}
       aria-current={active ? 'page' : undefined}
-      className={`group relative flex items-center gap-2.5 pl-9 pr-3 py-1.5 rounded-lg text-[13px] transition-all
+      className={`${base}
         ${active
           ? 'bg-white/10 text-white ring-1 ring-white/10'
           : 'text-surface-400 hover:bg-white/5 hover:text-white'}`}
@@ -229,16 +241,22 @@ export default function Layout({ children }) {
                               active={pathname === '/projects'}
                               collapsed={collapsed}
                             />
-                            {isInsideProject && PROJECT_CHILDREN.map((c) => (
+                            {PROJECT_CHILDREN.map((c) => (
                               <ChildNavItem
                                 key={c.key}
-                                to={`/projects/${activeProjectId}/${c.sub}`}
+                                to={activeProjectId ? `/projects/${activeProjectId}/${c.sub}` : '/projects'}
                                 label={c.label}
                                 icon={c.icon}
                                 active={isChildActive(c.sub)}
                                 collapsed={collapsed}
+                                disabled={!activeProjectId}
                               />
                             ))}
+                            {!activeProjectId && (
+                              <div className="pl-9 pr-3 pt-1 text-[11px] text-surface-500">
+                                Open a project to enable
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
