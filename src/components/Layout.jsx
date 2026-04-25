@@ -5,7 +5,7 @@ import {
   Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings,
   Clock, Bot, Users, Search, ChevronsLeft, ChevronsRight, ChevronDown,
   ChevronRight, Sparkles, HelpCircle, FileText, ClipboardList, Puzzle,
-  BookOpen, Activity,
+  BookOpen, Activity, Sun, Moon,
 } from 'lucide-react';
 import { getCurrentProjectId } from '../utils/currentProject';
 import CommandPalette from './CommandPalette';
@@ -44,8 +44,8 @@ function NavItem({ to, label, icon: Icon, active, collapsed }) {
           ? 'bg-white/10 text-white shadow-inner ring-1 ring-white/10'
           : 'text-surface-300 hover:bg-white/5 hover:text-white'}`}
     >
-      {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-gradient-to-b from-brand-400 to-brand-600" />}
-      <Icon size={18} className={`shrink-0 ${active ? 'text-brand-300' : 'text-surface-400 group-hover:text-white'}`} />
+      {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-gradient-to-b from-lime-400 to-lime-500 shadow-[0_0_8px_rgba(125,255,0,0.45)]" />}
+      <Icon size={18} className={`shrink-0 ${active ? 'text-lime-400' : 'text-surface-400 group-hover:text-white'}`} />
       {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
@@ -63,8 +63,8 @@ function ParentNavItem({ label, icon: Icon, active, expanded, onToggle, collapse
           ? 'bg-white/10 text-white shadow-inner ring-1 ring-white/10'
           : 'text-surface-300 hover:bg-white/5 hover:text-white'}`}
     >
-      {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-gradient-to-b from-brand-400 to-brand-600" />}
-      <Icon size={18} className={`shrink-0 ${active ? 'text-brand-300' : 'text-surface-400 group-hover:text-white'}`} />
+      {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-gradient-to-b from-lime-400 to-lime-500 shadow-[0_0_8px_rgba(125,255,0,0.45)]" />}
+      <Icon size={18} className={`shrink-0 ${active ? 'text-lime-400' : 'text-surface-400 group-hover:text-white'}`} />
       {!collapsed && (
         <>
           <span className="truncate flex-1 text-left">{label}</span>
@@ -90,7 +90,7 @@ function ChildNavItem({ to, label, icon: Icon, active, collapsed }) {
           ? 'bg-white/10 text-white ring-1 ring-white/10'
           : 'text-surface-400 hover:bg-white/5 hover:text-white'}`}
     >
-      <Icon size={14} className={`shrink-0 ${active ? 'text-brand-300' : 'text-surface-500 group-hover:text-white'}`} />
+      <Icon size={14} className={`shrink-0 ${active ? 'text-lime-400' : 'text-surface-500 group-hover:text-white'}`} />
       {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
@@ -105,12 +105,23 @@ export default function Layout({ children }) {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('tf:nav-collapsed') === '1';
   });
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'light';
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+  });
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem('tf:nav-collapsed', collapsed ? '1' : '0');
   }, [collapsed]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') root.classList.add('dark');
+    else root.classList.remove('dark');
+    localStorage.setItem('tf:theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     const onClick = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
@@ -182,7 +193,7 @@ export default function Layout({ children }) {
   const sidebarW = collapsed ? 'w-[72px]' : 'w-64';
 
   return (
-    <div className="min-h-screen flex bg-surface-50">
+    <div className="min-h-screen flex bg-surface-50 dark:bg-surface-950">
       {/* ------- Sidebar ------- */}
       <aside
         className={`${sidebarW} bg-surface-950 text-white flex flex-col fixed h-full z-40 transition-[width] duration-200 ease-out border-r border-white/5`}
@@ -318,7 +329,7 @@ export default function Layout({ children }) {
       {/* ------- Main area ------- */}
       <div className={`flex-1 min-h-screen ${collapsed ? 'ml-[72px]' : 'ml-64'} transition-[margin] duration-200`}>
         {/* Top bar */}
-        <header className="h-16 sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-surface-200/70 flex items-center px-6 gap-4">
+        <header className="h-16 sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-surface-200/70 flex items-center px-6 gap-4 dark:bg-surface-950/80 dark:border-surface-800">
           <div className="flex-1 max-w-xl relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 pointer-events-none" />
             <input
@@ -327,7 +338,9 @@ export default function Layout({ children }) {
               placeholder="Search projects, tests, executions…"
               className="w-full pl-9 pr-16 py-2 text-sm rounded-lg bg-surface-100/70 border border-transparent placeholder:text-surface-400
                          hover:bg-surface-100 focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none
-                         transition-colors"
+                         transition-colors
+                         dark:bg-surface-900/70 dark:text-surface-100 dark:placeholder:text-surface-500
+                         dark:hover:bg-surface-900 dark:focus:bg-surface-900 dark:focus:border-lime-500 dark:focus:ring-lime-500/15"
             />
             <span className="absolute right-2 top-1/2 -translate-y-1/2 hidden md:inline-flex text-xs text-surface-400 font-mono">⌘K</span>
           </div>
@@ -335,6 +348,15 @@ export default function Layout({ children }) {
             <Link to="/run-test" className="btn-primary btn-sm">
               <Sparkles size={14} /> New Test
             </Link>
+            <button
+              type="button"
+              onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+              className="icon-btn"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
             <a
               href="https://github.com/anthropics/claude-code/issues"
               target="_blank"
