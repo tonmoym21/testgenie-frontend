@@ -8,10 +8,10 @@ import { CheckCircle2, XCircle, Clock } from 'lucide-react';
 export default function RecentRunsRow({ runs = [] }) {
   if (!runs || runs.length === 0) {
     return (
-      <div className="text-center py-8 text-surface-400">
+      <div className="text-center py-8 text-surface-400 dark:text-surface-500">
         <Clock size={24} className="mx-auto mb-2 opacity-40" />
-        <p className="text-sm">No recent runs</p>
-        <p className="text-xs text-surface-400 mt-1">Execute a test to see it here</p>
+        <p className="text-sm">No runs yet</p>
+        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">First run will appear here</p>
       </div>
     );
   }
@@ -19,13 +19,13 @@ export default function RecentRunsRow({ runs = [] }) {
   const getStatusColor = (status) => {
     switch (status) {
       case 'passed':
-        return 'bg-emerald-50 text-emerald-700';
+        return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300';
       case 'failed':
-        return 'bg-red-50 text-red-700';
+        return 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300';
       case 'running':
-        return 'bg-brand-50 text-brand-700';
+        return 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300';
       default:
-        return 'bg-surface-50 text-surface-600';
+        return 'bg-surface-50 text-surface-600 dark:bg-surface-800 dark:text-surface-300';
     }
   };
 
@@ -64,26 +64,23 @@ export default function RecentRunsRow({ runs = [] }) {
         <Link
           key={run.id}
           to={`/executions/${run.id}`}
-          className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-50 transition-colors group"
+          className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800/60 transition-colors group"
         >
-          {/* Status badge */}
           <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold ${getStatusColor(run.status)}`}>
             {getStatusIcon(run.status)}
           </div>
 
-          {/* Run info */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-surface-900 truncate group-hover:text-brand-600">
+            <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate group-hover:text-brand-600 dark:group-hover:text-lime-400">
               {run.testName || 'Unnamed test'}
             </p>
-            <p className="text-xs text-surface-500 truncate">
+            <p className="text-xs text-surface-500 dark:text-surface-400 truncate">
               {run.projectName && `${run.projectName} · `}
-              {run.duration ? `${run.duration}ms` : 'pending'}
+              <span className="tabular-nums">{run.duration ? `${run.duration}ms` : 'pending'}</span>
             </p>
           </div>
 
-          {/* Timestamp */}
-          <div className="text-xs text-surface-400 flex-shrink-0 whitespace-nowrap">
+          <div className="text-xs text-surface-400 dark:text-surface-500 flex-shrink-0 whitespace-nowrap tabular-nums">
             {formatTime(run.timestamp)}
           </div>
         </Link>

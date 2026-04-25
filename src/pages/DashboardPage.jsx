@@ -75,10 +75,10 @@ function SkeletonCard() {
 
 function QuickActionCard({ to, icon: Icon, title, subtitle, tone = 'brand' }) {
   const tones = {
-    brand:   'bg-brand-50 text-brand-600 group-hover:bg-brand-100',
-    purple:  'bg-purple-50 text-purple-600 group-hover:bg-purple-100',
-    success: 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100',
-    warn:    'bg-amber-50 text-amber-600 group-hover:bg-amber-100',
+    brand:   'bg-brand-50 text-brand-600 group-hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:group-hover:bg-brand-500/20',
+    purple:  'bg-purple-50 text-purple-600 group-hover:bg-purple-100 dark:bg-purple-500/10 dark:text-purple-300 dark:group-hover:bg-purple-500/20',
+    success: 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:group-hover:bg-emerald-500/20',
+    warn:    'bg-amber-50 text-amber-600 group-hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:group-hover:bg-amber-500/20',
   };
   return (
     <Link to={to} className="card-interactive p-4 flex items-center gap-3 group">
@@ -86,10 +86,10 @@ function QuickActionCard({ to, icon: Icon, title, subtitle, tone = 'brand' }) {
         <Icon size={18} />
       </div>
       <div className="min-w-0">
-        <p className="font-semibold text-sm text-surface-800 truncate">{title}</p>
-        <p className="text-xs text-surface-500 truncate">{subtitle}</p>
+        <p className="font-semibold text-sm text-surface-800 dark:text-surface-100 truncate">{title}</p>
+        <p className="text-xs text-surface-500 dark:text-surface-400 truncate">{subtitle}</p>
       </div>
-      <ArrowRight size={15} className="ml-auto text-surface-300 group-hover:text-brand-500 transition-colors" />
+      <ArrowRight size={15} className="ml-auto text-surface-300 group-hover:text-brand-500 transition-colors dark:text-surface-600 dark:group-hover:text-lime-400" />
     </Link>
   );
 }
@@ -97,26 +97,26 @@ function QuickActionCard({ to, icon: Icon, title, subtitle, tone = 'brand' }) {
 function ActivityFeed({ activities }) {
   if (!activities || activities.length === 0) {
     return (
-      <div className="text-center py-10 text-surface-400">
+      <div className="text-center py-10 text-surface-400 dark:text-surface-500">
         <Users size={28} className="mx-auto mb-2 opacity-40" />
-        <p className="text-sm">No recent activity</p>
-        <p className="text-xs text-surface-400 mt-1">Run a test to see activity here</p>
+        <p className="text-sm">No activity yet</p>
+        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">Activity shows up after the first run</p>
       </div>
     );
   }
 
   return (
-    <ul className="divide-y divide-surface-100">
+    <ul className="divide-y divide-surface-100 dark:divide-surface-800">
       {activities.map((a) => (
         <li key={a.id} className="flex items-start gap-3 py-3 px-1">
           <div className="w-8 h-8 rounded-full bg-gradient-brand text-white flex items-center justify-center text-xs font-semibold shrink-0">
             {a.avatar || (a.user || '?').charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-surface-700">
-              <span className="font-medium text-surface-900">{a.user}</span>
-              <span className="text-surface-500"> {a.action} </span>
-              <Link to={`/executions/${a.id}`} className="font-medium text-brand-600 hover:text-brand-700 truncate inline-block max-w-[220px] align-bottom">
+            <p className="text-sm text-surface-700 dark:text-surface-300">
+              <span className="font-medium text-surface-900 dark:text-surface-100">{a.user}</span>
+              <span className="text-surface-500 dark:text-surface-400"> {a.action} </span>
+              <Link to={`/executions/${a.id}`} className="font-medium text-brand-600 hover:text-brand-700 dark:text-lime-400 dark:hover:text-lime-300 truncate inline-block max-w-[220px] align-bottom">
                 {a.target}
               </Link>
             </p>
@@ -124,7 +124,7 @@ function ActivityFeed({ activities }) {
               <span className={a.result === 'passed' ? 'badge-success' : a.result === 'failed' ? 'badge-danger' : 'badge-muted'}>
                 {a.result}
               </span>
-              <span className="text-xs text-surface-400">
+              <span className="text-xs text-surface-400 dark:text-surface-500">
                 {a.time ? new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
               </span>
             </div>
@@ -191,13 +191,23 @@ export default function DashboardPage() {
 
   const { summary, byType, dailyTrend, recentFailures, schedules } = metrics || EMPTY_METRICS;
 
+  const sparkSeries = (() => {
+    const trend = Array.isArray(dailyTrend) ? dailyTrend.slice(-14) : [];
+    const totals = trend.map((d) => d.total ?? (d.passed ?? 0) + (d.failed ?? 0));
+    const passRates = trend.map((d) => {
+      const t = d.total ?? (d.passed ?? 0) + (d.failed ?? 0);
+      return t ? ((d.passed ?? 0) / t) * 100 : 0;
+    });
+    return { totals, passRates };
+  })();
+
   return (
     <div className="page">
       {/* Header */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">A live view of your test quality.</p>
+          <h1 className="page-title">Overview</h1>
+          <p className="page-subtitle">Last 30 days · live</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -210,14 +220,14 @@ export default function DashboardPage() {
             Refresh
           </button>
           <Link to="/run-test" className="btn-primary btn-sm">
-            <Sparkles size={14} /> Run a test
+            <Sparkles size={14} /> New run
           </Link>
         </div>
       </div>
 
       {sessionError && (
-        <div role="alert" className="mb-6 card p-4 bg-amber-50/80 border-amber-200">
-          <p className="text-sm text-amber-800">{sessionError}</p>
+        <div role="alert" className="mb-6 card p-4 bg-amber-50/80 border-amber-200 dark:bg-amber-500/10 dark:border-amber-400/30">
+          <p className="text-sm text-amber-800 dark:text-amber-200">{sessionError}</p>
         </div>
       )}
 
@@ -227,34 +237,36 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {loading ? (
           <>
-            <div className="bg-surface-100 rounded-lg h-24 animate-pulse" />
-            <div className="bg-surface-100 rounded-lg h-24 animate-pulse" />
-            <div className="bg-surface-100 rounded-lg h-24 animate-pulse" />
-            <div className="bg-surface-100 rounded-lg h-24 animate-pulse" />
+            <div className="bg-surface-100 dark:bg-surface-800 rounded-lg h-24 animate-pulse" />
+            <div className="bg-surface-100 dark:bg-surface-800 rounded-lg h-24 animate-pulse" />
+            <div className="bg-surface-100 dark:bg-surface-800 rounded-lg h-24 animate-pulse" />
+            <div className="bg-surface-100 dark:bg-surface-800 rounded-lg h-24 animate-pulse" />
           </>
         ) : (
           <>
             <TrendCard
-              label="Total Runs"
+              label="Runs (30d)"
               value={summary?.totalRuns || 0}
+              data={sparkSeries.totals}
               color="brand"
               icon={Activity}
             />
             <TrendCard
-              label="Pass Rate"
+              label="Pass rate"
               value={`${summary?.passRate || 0}%`}
               trend={Math.round((summary?.passRate || 0) - 85)}
+              data={sparkSeries.passRates}
               color="success"
               icon={CheckCircle2}
             />
             <TrendCard
-              label="Avg Duration"
+              label="Avg duration"
               value={`${summary?.avgDuration || 0}ms`}
               color="warn"
               icon={Clock}
             />
             <TrendCard
-              label="Active Schedules"
+              label="Schedules"
               value={schedules?.active || 0}
               color="purple"
               icon={Calendar}
@@ -266,18 +278,18 @@ export default function DashboardPage() {
       {/* Recent runs summary */}
       <div className="card p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold flex items-center gap-2 text-surface-800">
-            <Activity size={16} className="text-brand-600" />
+          <h3 className="font-semibold flex items-center gap-2 text-surface-800 dark:text-surface-100">
+            <Activity size={16} className="text-brand-600 dark:text-lime-400" />
             Recent runs
           </h3>
-          <Link to="/executions" className="text-sm text-brand-600 hover:text-brand-700 font-medium">
+          <Link to="/executions" className="text-sm text-brand-600 hover:text-brand-700 font-medium dark:text-lime-400 dark:hover:text-lime-300">
             View all →
           </Link>
         </div>
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 bg-surface-50 rounded-lg animate-pulse" />
+              <div key={i} className="h-12 bg-surface-50 dark:bg-surface-800 rounded-lg animate-pulse" />
             ))}
           </div>
         ) : (
@@ -289,11 +301,11 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="card p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold flex items-center gap-2 text-surface-800">
-              <BarChart3 size={16} className="text-brand-600" />
-              30-day trend
+            <h3 className="font-semibold flex items-center gap-2 text-surface-800 dark:text-surface-100">
+              <BarChart3 size={16} className="text-brand-600 dark:text-lime-400" />
+              Pass rate · 30d
             </h3>
-            <Link to="/executions" className="text-sm text-brand-600 hover:text-brand-700 font-medium">
+            <Link to="/executions" className="text-sm text-brand-600 hover:text-brand-700 font-medium dark:text-lime-400 dark:hover:text-lime-300">
               View all →
             </Link>
           </div>
@@ -301,12 +313,11 @@ export default function DashboardPage() {
         </div>
 
         <div className="card p-5">
-          <h3 className="font-semibold text-surface-800 mb-4">Quick actions</h3>
           <div className="space-y-2.5">
-            <QuickActionCard to="/run-test"     icon={Zap}        title="Run a test"      subtitle="Execute UI or API right now" tone="brand" />
-            <QuickActionCard to="/collections"  icon={FolderOpen} title="Collections"     subtitle="Organize your test suites"   tone="purple" />
-            <QuickActionCard to="/schedules"    icon={Calendar}   title="Schedules"       subtitle="Automate recurring runs"     tone="success" />
-            <QuickActionCard to="/environments" icon={Globe}      title="Environments"    subtitle="Manage variables & secrets"  tone="warn" />
+            <QuickActionCard to="/run-test"     icon={Zap}        title="New run"        subtitle="UI or API, on demand"       tone="brand" />
+            <QuickActionCard to="/collections"  icon={FolderOpen} title="Collections"    subtitle="Group related tests"        tone="purple" />
+            <QuickActionCard to="/schedules"    icon={Calendar}   title="Schedules"      subtitle="Recurring runs"             tone="success" />
+            <QuickActionCard to="/environments" icon={Globe}      title="Environments"   subtitle="Variables & secrets"        tone="warn" />
           </div>
         </div>
       </div>
@@ -314,10 +325,10 @@ export default function DashboardPage() {
       {/* Activity + Failures */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
-            <h3 className="font-semibold flex items-center gap-2 text-surface-800">
-              <Users size={16} className="text-surface-500" />
-              Recent activity
+          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100 dark:border-surface-800">
+            <h3 className="font-semibold flex items-center gap-2 text-surface-800 dark:text-surface-100">
+              <Users size={16} className="text-surface-500 dark:text-surface-400" />
+              Activity
             </h3>
           </div>
           <div className="px-5 py-2 max-h-80 scroll-area">
@@ -326,12 +337,12 @@ export default function DashboardPage() {
         </div>
 
         <div className="card overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
-            <h3 className="font-semibold flex items-center gap-2 text-surface-800">
-              <AlertTriangle size={16} className="text-red-500" />
-              Recent failures
+          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100 dark:border-surface-800">
+            <h3 className="font-semibold flex items-center gap-2 text-surface-800 dark:text-surface-100">
+              <AlertTriangle size={16} className="text-red-500 dark:text-red-400" />
+              Failures
             </h3>
-            <Link to="/executions?status=failed" className="text-xs text-brand-600 hover:text-brand-700 font-medium">View all</Link>
+            <Link to="/executions?status=failed" className="text-xs text-brand-600 hover:text-brand-700 font-medium dark:text-lime-400 dark:hover:text-lime-300">View all</Link>
           </div>
           <div className="p-4 max-h-80 scroll-area">
             {recentFailures && recentFailures.length > 0 ? (
@@ -340,21 +351,22 @@ export default function DashboardPage() {
                   <Link
                     key={f.id}
                     to={`/executions/${f.id}`}
-                    className="flex items-start justify-between gap-3 p-3 bg-red-50/60 hover:bg-red-50 rounded-lg transition-colors ring-1 ring-red-600/10"
+                    className="flex items-start justify-between gap-3 p-3 bg-red-50/60 hover:bg-red-50 rounded-lg transition-colors ring-1 ring-red-600/10
+                               dark:bg-red-500/5 dark:hover:bg-red-500/10 dark:ring-red-400/20"
                   >
                     <div className="min-w-0">
-                      <p className="font-medium text-sm text-surface-800 truncate">{f.testName}</p>
-                      <p className="text-xs text-red-700 mt-1 truncate">{f.error}</p>
+                      <p className="font-medium text-sm text-surface-800 dark:text-surface-100 truncate">{f.testName}</p>
+                      <p className="text-xs text-red-700 dark:text-red-300 mt-1 truncate">{f.error}</p>
                     </div>
-                    <span className="text-xs text-surface-400 font-mono shrink-0">{f.durationMs}ms</span>
+                    <span className="text-xs text-surface-400 dark:text-surface-500 font-mono shrink-0 tabular-nums">{f.durationMs}ms</span>
                   </Link>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-10 text-surface-400">
-                <CheckCircle2 size={28} className="mx-auto mb-2 text-emerald-500/60" />
-                <p className="text-sm text-surface-500 font-medium">All tests green</p>
-                <p className="text-xs text-surface-400">No recent failures</p>
+              <div className="text-center py-10 text-surface-400 dark:text-surface-500">
+                <CheckCircle2 size={28} className="mx-auto mb-2 text-emerald-500/60 dark:text-emerald-400/60" />
+                <p className="text-sm text-surface-500 dark:text-surface-300 font-medium">All green</p>
+                <p className="text-xs text-surface-400 dark:text-surface-500">No recent failures</p>
               </div>
             )}
           </div>
