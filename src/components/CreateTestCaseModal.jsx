@@ -50,7 +50,7 @@ function parseContent(content) {
 
 const PRIORITIES = [
   { value: 'critical', label: 'Critical', color: 'text-red-600' },
-  { value: 'high',     label: 'High',     color: 'text-orange-600' },
+  { value: 'high',     label: 'High',     color: 'text-purple-600' },
   { value: 'medium',   label: 'Medium',   color: 'text-amber-600' },
   { value: 'low',      label: 'Low',      color: 'text-surface-500' },
 ];

@@ -10,7 +10,7 @@ const API_BASE =
     : 'https://testgenie-backend-production.up.railway.app';
 
 const CATEGORY_OPTIONS = [
-  { value: 'smoke', label: 'Smoke', color: 'bg-orange-100 text-orange-700 border-orange-300' },
+  { value: 'smoke', label: 'Smoke', color: 'bg-indigo-100 text-indigo-700 border-indigo-300' },
   { value: 'regression', label: 'Regression', color: 'bg-blue-100 text-blue-700 border-blue-300' },
   { value: 'sanity', label: 'Sanity', color: 'bg-green-100 text-green-700 border-green-300' },
   { value: 'critical_path', label: 'Critical Path', color: 'bg-red-100 text-red-700 border-red-300' },

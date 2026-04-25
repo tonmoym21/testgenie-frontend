@@ -8,6 +8,7 @@ import {
   BookOpen, Activity,
 } from 'lucide-react';
 import { getCurrentProjectId } from '../utils/currentProject';
+import CommandPalette from './CommandPalette';
 
 // Projects is a parent module. Its 5 children are revealed when a project
 // is opened (URL `/projects/:id/...` or a project has been selected before).
@@ -311,6 +312,9 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
+      {/* Command Palette (global) */}
+      <CommandPalette />
+
       {/* ------- Main area ------- */}
       <div className={`flex-1 min-h-screen ${collapsed ? 'ml-[72px]' : 'ml-64'} transition-[margin] duration-200`}>
         {/* Top bar */}
@@ -325,7 +329,7 @@ export default function Layout({ children }) {
                          hover:bg-surface-100 focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none
                          transition-colors"
             />
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 hidden md:inline-flex kbd">/</span>
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 hidden md:inline-flex text-xs text-surface-400 font-mono">⌘K</span>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/run-test" className="btn-primary btn-sm">

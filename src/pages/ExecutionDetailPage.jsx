@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { ArrowLeft, CheckCircle, XCircle, Clock, Image, Terminal, AlertTriangle, Info } from 'lucide-react';
+import ExecutionTimeline from '../components/execution/ExecutionTimeline';
+import LogsPanel from '../components/execution/LogsPanel';
+import NetworkPanel from '../components/execution/NetworkPanel';
+import AssertionDiff from '../components/execution/AssertionDiff';
 
 const LOG_ICON = {
   info: <Info size={12} className="text-blue-400 mt-0.5 shrink-0" />,
@@ -14,7 +18,8 @@ export default function ExecutionDetailPage() {
   const { executionId } = useParams();
   const [exec, setExec] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showDebug, setShowDebug] = useState(false);
+  const [activeTab, setActiveTab] = useState('logs');
+  const [selectedStepIdx, setSelectedStepIdx] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -40,7 +45,6 @@ export default function ExecutionDetailPage() {
 
   const logs = exec ? (typeof exec.logs === 'string' ? JSON.parse(exec.logs) : exec.logs || []) : [];
   const screenshots = exec ? (typeof exec.screenshots === 'string' ? JSON.parse(exec.screenshots) : exec.screenshots || []) : [];
-  const filteredLogs = showDebug ? logs : logs.filter((l) => l.level !== 'debug');
 
   return (
     <div className="page">
@@ -85,75 +89,105 @@ export default function ExecutionDetailPage() {
       )}
 
       {!loading && exec && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <div className="card overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-3 border-b border-surface-100">
-                <h2 className="font-semibold text-sm flex items-center gap-2 text-surface-900">
-                  <Terminal size={16} /> Execution logs
-                </h2>
-                <label className="flex items-center gap-2 text-xs text-surface-500 cursor-pointer">
-                  <input type="checkbox" checked={showDebug} onChange={(e) => setShowDebug(e.target.checked)}
-                    className="rounded border-surface-300 text-brand-600 focus:ring-brand-500" />
-                  Show debug
-                </label>
-              </div>
-              <div className="p-4 max-h-[600px] overflow-y-auto">
-                {filteredLogs.length === 0 ? (
-                  <p className="text-sm text-surface-400 text-center py-8">No logs available</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {filteredLogs.map((log, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs font-mono">
-                        {LOG_ICON[log.level] || LOG_ICON.info}
-                        <span className="text-surface-400 shrink-0">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                        <span className={log.level === 'error' ? 'text-red-600' : log.level === 'warn' ? 'text-amber-600' : 'text-surface-700'}>
-                          {log.message}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-250px)]">
+          {/* Timeline (left panel) */}
+          <div className="lg:col-span-1 order-2 lg:order-1">
+            <div className="card p-4 h-full overflow-y-auto">
+              <h3 className="font-semibold text-sm mb-3 text-surface-800">Execution Steps</h3>
+              <ExecutionTimeline
+                steps={exec.steps || []}
+                selectedStepIndex={selectedStepIdx}
+                onStepSelect={setSelectedStepIdx}
+              />
             </div>
           </div>
 
-          <div>
-            <div className="card overflow-hidden">
-              <div className="px-5 py-3 border-b border-surface-100">
-                <h2 className="font-semibold text-sm flex items-center gap-2 text-surface-900">
-                  <Image size={16} /> Screenshots ({screenshots.length})
-                </h2>
-              </div>
-              <div className="p-4">
-                {screenshots.length === 0 ? (
-                  <p className="text-sm text-surface-400 text-center py-8">No screenshots captured</p>
-                ) : (
-                  <div className="space-y-3">
-                    {screenshots.map((filename, i) => (
-                      <div key={i} className="rounded-lg ring-1 ring-surface-200/60 overflow-hidden">
-                        <img src={`/api/screenshots/${filename}`} alt={`Screenshot ${i + 1}`}
-                          className="w-full h-auto" onError={(e) => { e.target.style.display = 'none'; }} />
-                        <div className="px-3 py-2 bg-surface-50 text-xs text-surface-500 truncate">{filename}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+          {/* Main content (right panel with tabs) */}
+          <div className="lg:col-span-3 order-1 lg:order-2 flex flex-col">
+            {/* Tab navigation */}
+            <div className="flex gap-2 mb-4 border-b border-surface-200">
+              <button
+                onClick={() => setActiveTab('logs')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'logs'
+                    ? 'border-brand-500 text-brand-600'
+                    : 'border-transparent text-surface-500 hover:text-surface-700'
+                }`}
+              >
+                <Terminal size={14} className="inline mr-1.5" />
+                Logs
+              </button>
+              <button
+                onClick={() => setActiveTab('network')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'network'
+                    ? 'border-brand-500 text-brand-600'
+                    : 'border-transparent text-surface-500 hover:text-surface-700'
+                }`}
+              >
+                Globe API
+              </button>
+              <button
+                onClick={() => setActiveTab('screenshots')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'screenshots'
+                    ? 'border-brand-500 text-brand-600'
+                    : 'border-transparent text-surface-500 hover:text-surface-700'
+                }`}
+              >
+                <Image size={14} className="inline mr-1.5" />
+                Screenshots ({screenshots.length})
+              </button>
+              {exec.assertions && exec.assertions.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('assertions')}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'assertions'
+                      ? 'border-brand-500 text-brand-600'
+                      : 'border-transparent text-surface-500 hover:text-surface-700'
+                  }`}
+                >
+                  Assertions ({exec.assertions.length})
+                </button>
+              )}
             </div>
 
-            {exec.testDefinition && (
-              <div className="card mt-6 overflow-hidden">
-                <div className="px-5 py-3 border-b border-surface-100">
-                  <h2 className="font-semibold text-sm text-surface-900">Test definition</h2>
+            {/* Tab content */}
+            <div className="flex-1 min-h-0">
+              {activeTab === 'logs' && <LogsPanel logs={logs} highlightedLineIndex={selectedStepIdx} />}
+              {activeTab === 'network' && <NetworkPanel requests={exec.requests || []} />}
+              {activeTab === 'screenshots' && (
+                <div className="card h-full overflow-y-auto">
+                  {screenshots.length === 0 ? (
+                    <div className="text-center py-8 text-surface-400">
+                      <Image size={20} className="mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">No screenshots captured</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4">
+                      {screenshots.map((filename, i) => (
+                        <div key={i} className="rounded-lg overflow-hidden ring-1 ring-surface-200">
+                          <img
+                            src={`/api/screenshots/${filename}`}
+                            alt={`Screenshot ${i + 1}`}
+                            className="w-full h-auto"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                          <div className="px-3 py-2 bg-surface-50 text-xs text-surface-500 truncate">
+                            {filename}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="p-4">
-                  <pre className="text-xs font-mono bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-64 text-surface-700">
-                    {JSON.stringify(typeof exec.testDefinition === 'string' ? JSON.parse(exec.testDefinition) : exec.testDefinition, null, 2)}
-                  </pre>
+              )}
+              {activeTab === 'assertions' && (
+                <div className="card p-4 h-full overflow-y-auto">
+                  <AssertionDiff assertions={exec.assertions || []} />
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}

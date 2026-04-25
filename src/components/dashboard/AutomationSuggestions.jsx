@@ -17,7 +17,7 @@ export default function AutomationSuggestions({ suggestions = [] }) {
     <div className="bg-white rounded-xl border border-surface-200 p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center">
             <Wand2 size={14} className="text-white" />
           </div>
           <div>

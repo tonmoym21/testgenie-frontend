@@ -9,6 +9,8 @@ import {
 
 import AlertsBanner from '../components/dashboard/AlertsBanner';
 import FailureTrends from '../components/dashboard/FailureTrends';
+import TrendCard from '../components/dashboard/TrendCard';
+import RecentRunsRow from '../components/dashboard/RecentRunsRow';
 
 const EMPTY_METRICS = {
   summary: { totalRuns: 0, passed: 0, failed: 0, running: 0, passRate: 0, avgDuration: 0 },
@@ -221,77 +223,66 @@ export default function DashboardPage() {
 
       {alerts.length > 0 && <div className="mb-6"><AlertsBanner alerts={alerts} /></div>}
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {/* Trend cards (compact metrics overview) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {loading ? (
           <>
-            <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+            <div className="bg-surface-100 rounded-lg h-24 animate-pulse" />
+            <div className="bg-surface-100 rounded-lg h-24 animate-pulse" />
+            <div className="bg-surface-100 rounded-lg h-24 animate-pulse" />
+            <div className="bg-surface-100 rounded-lg h-24 animate-pulse" />
           </>
         ) : (
           <>
-            <StatCard
-              title="Total runs"
+            <TrendCard
+              label="Total Runs"
               value={summary?.totalRuns || 0}
-              subtitle={`${summary?.running || 0} running now`}
+              color="brand"
               icon={Activity}
-              tone="brand"
             />
-            <StatCard
-              title="Pass rate"
+            <TrendCard
+              label="Pass Rate"
               value={`${summary?.passRate || 0}%`}
-              subtitle={`${summary?.passed || 0} passed · ${summary?.failed || 0} failed`}
+              trend={Math.round((summary?.passRate || 0) - 85)}
+              color="success"
               icon={CheckCircle2}
-              tone="success"
             />
-            <StatCard
-              title="Avg duration"
+            <TrendCard
+              label="Avg Duration"
               value={`${summary?.avgDuration || 0}ms`}
-              subtitle="Across completed runs"
+              color="warn"
               icon={Clock}
-              tone="warn"
             />
-            <StatCard
-              title="Active schedules"
+            <TrendCard
+              label="Active Schedules"
               value={schedules?.active || 0}
-              subtitle={`of ${schedules?.total || 0} total`}
+              color="purple"
               icon={Calendar}
-              tone="purple"
-              to="/schedules"
             />
           </>
         )}
       </div>
 
-      {/* By-type summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <Link to="/dashboard/api" className="card-interactive p-5 flex items-center justify-between group">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-              <Globe size={22} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-surface-900">API tests</h3>
-              <p className="text-sm text-surface-500">
-                {byType?.api?.count || 0} runs · {byType?.api?.passed || 0} passed
-              </p>
-            </div>
+      {/* Recent runs summary */}
+      <div className="card p-5 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold flex items-center gap-2 text-surface-800">
+            <Activity size={16} className="text-brand-600" />
+            Recent runs
+          </h3>
+          <Link to="/executions" className="text-sm text-brand-600 hover:text-brand-700 font-medium">
+            View all →
+          </Link>
+        </div>
+        {loading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-12 bg-surface-50 rounded-lg animate-pulse" />
+            ))}
           </div>
-          <ArrowRight size={18} className="text-surface-300 group-hover:text-brand-500 transition-colors" />
-        </Link>
-        <Link to="/dashboard/automation" className="card-interactive p-5 flex items-center justify-between group">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center group-hover:bg-brand-100 transition-colors">
-              <Monitor size={22} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-surface-900">UI / Automation</h3>
-              <p className="text-sm text-surface-500">
-                {byType?.ui?.count || 0} runs · {byType?.ui?.passed || 0} passed
-              </p>
-            </div>
-          </div>
-          <ArrowRight size={18} className="text-surface-300 group-hover:text-brand-500 transition-colors" />
-        </Link>
+        ) : (
+          <RecentRunsRow runs={metrics?.recentRuns || []} />
+        )}
       </div>
 
       {/* Trend + Quick actions */}

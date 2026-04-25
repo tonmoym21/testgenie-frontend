@@ -69,7 +69,7 @@ export default function ProjectsPage() {
       'from-brand-500 to-brand-700',
       'from-purple-500 to-brand-600',
       'from-emerald-500 to-teal-600',
-      'from-amber-500 to-orange-600',
+      'from-amber-500 to-purple-600',
       'from-rose-500 to-pink-600',
       'from-indigo-500 to-brand-700',
     ];

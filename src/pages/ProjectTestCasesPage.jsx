@@ -12,7 +12,7 @@ import { setCurrentProjectId } from '../utils/currentProject';
 
 const PRIORITY_STYLES = {
   critical: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/15',
-  high:     'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/15',
+  high:     'bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-600/15',
   medium:   'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/15',
   low:      'bg-surface-100 text-surface-600 ring-1 ring-inset ring-surface-300/40',
 };

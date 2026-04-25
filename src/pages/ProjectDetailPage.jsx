@@ -9,7 +9,7 @@ import ExportCsvButton from '../components/ExportCsvButton';
 
 const PRIORITY_STYLES = {
   critical: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/15',
-  high:     'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/15',
+  high:     'bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-600/15',
   medium:   'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/15',
   low:      'bg-surface-100 text-surface-600 ring-1 ring-inset ring-surface-300/40',
 };
@@ -263,7 +263,7 @@ export default function ProjectDetailPage() {
                 <div className="space-y-2">
                   <h5 className="text-[10px] font-semibold uppercase tracking-wider text-surface-400">Gaps found</h5>
                   {analysisResult.result.gaps.map((gap, i) => (
-                    <div key={i} className="bg-orange-50 rounded-lg p-3 ring-1 ring-inset ring-orange-100">
+                    <div key={i} className="bg-purple-50 rounded-lg p-3 ring-1 ring-inset ring-purple-100">
                       <div className="flex items-center gap-2">
                         <span className={`badge ${PRIORITY_STYLES[gap.suggestedPriority] || PRIORITY_STYLES.medium}`}>{gap.suggestedPriority}</span>
                         <span className="text-sm font-medium text-surface-900">{gap.area}</span>

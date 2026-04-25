@@ -17,7 +17,7 @@ const TIME_RANGES = [
 
 const PRIORITY_TONES = {
   critical: 'bg-red-500',
-  high: 'bg-orange-500',
+  high: 'bg-purple-500',
   medium: 'bg-amber-500',
   low: 'bg-surface-400',
 };
