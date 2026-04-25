@@ -2,11 +2,32 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  Beaker, FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings,
+  FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings,
   Clock, Bot, Users, Search, ChevronsLeft, ChevronsRight, ChevronDown,
   ChevronRight, Sparkles, HelpCircle, FileText, ClipboardList, Puzzle,
   BookOpen, Activity, Sun, Moon,
 } from 'lucide-react';
+
+function ForgeMark({ size = 20 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M5 18 L12 5 L19 18 Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <path d="M10.2 18 L12 12 L13.8 18 Z" fill="#7DFF00" />
+    </svg>
+  );
+}
 import { getCurrentProjectId } from '../utils/currentProject';
 import CommandPalette from './CommandPalette';
 
@@ -190,7 +211,7 @@ export default function Layout({ children }) {
   };
 
   const initial = (user?.email || '?').charAt(0).toUpperCase();
-  const sidebarW = collapsed ? 'w-[72px]' : 'w-64';
+  const sidebarW = collapsed ? 'w-[64px]' : 'w-56';
 
   return (
     <div className="min-h-screen flex bg-surface-50 dark:bg-surface-950">
@@ -199,16 +220,15 @@ export default function Layout({ children }) {
         className={`${sidebarW} bg-surface-950 text-white flex flex-col fixed h-full z-40 transition-[width] duration-200 ease-out border-r border-white/5`}
       >
         {/* Brand */}
-        <div className="h-16 flex items-center px-4 border-b border-white/5">
+        <div className="h-16 flex items-center px-3 border-b border-white/5">
           <Link to="/dashboard" className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-brand flex items-center justify-center shadow-glow shrink-0">
-              <Beaker size={18} />
+            <div className="w-8 h-8 rounded-lg bg-surface-900 ring-1 ring-white/10 text-white flex items-center justify-center shrink-0">
+              <ForgeMark size={18} />
             </div>
             {!collapsed && (
-              <div className="min-w-0">
-                <span className="block font-semibold text-[15px] tracking-tight leading-none">TestForge</span>
-                <span className="block text-[10px] text-brand-300/70 uppercase tracking-[0.18em] mt-1">Build · Run · Trust</span>
-              </div>
+              <span className="font-semibold text-[14px] tracking-tight leading-none">
+                TestForge
+              </span>
             )}
           </Link>
         </div>
@@ -327,7 +347,7 @@ export default function Layout({ children }) {
       <CommandPalette />
 
       {/* ------- Main area ------- */}
-      <div className={`flex-1 min-h-screen ${collapsed ? 'ml-[72px]' : 'ml-64'} transition-[margin] duration-200`}>
+      <div className={`flex-1 min-h-screen ${collapsed ? 'ml-[64px]' : 'ml-56'} transition-[margin] duration-200`}>
         {/* Top bar */}
         <header className="h-16 sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-surface-200/70 flex items-center px-6 gap-4 dark:bg-surface-950/80 dark:border-surface-800">
           <div className="flex-1 max-w-xl relative">
