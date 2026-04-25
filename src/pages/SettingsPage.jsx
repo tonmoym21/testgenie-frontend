@@ -19,19 +19,15 @@ export default function SettingsPage() {
     <div>
       <div className="px-6 pt-6">
         <h1 className="page-title mb-1">Settings</h1>
-        <p className="page-subtitle">Configure team members, environments, and global variables.</p>
+        <p className="page-subtitle">Team, environments, globals</p>
       </div>
-      <div className="px-6 border-b border-surface-200/70 mt-4">
-        <nav className="flex gap-1">
+      <div className="px-6 mt-4">
+        <nav className="tabs">
           {available.map((t) => (
             <button
               key={t.id}
               onClick={() => setActive(t.id)}
-              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                active === t.id
-                  ? 'border-brand-500 text-brand-700'
-                  : 'border-transparent text-surface-500 hover:text-surface-800'
-              }`}
+              className={`tab ${active === t.id ? 'tab-active' : ''}`}
             >
               {t.label}
             </button>
