@@ -83,7 +83,7 @@ export default function ProjectsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Projects</h1>
-          <p className="page-subtitle">Your workspaces for organizing and running tests.</p>
+          <p className="page-subtitle">Test workspaces</p>
         </div>
         <button onClick={() => setShowCreate(true)} className="btn-primary">
           <Plus size={16} /> New project
@@ -91,9 +91,10 @@ export default function ProjectsPage() {
       </div>
 
       {error && (
-        <div role="alert" className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg border border-red-200 mb-6 flex items-start justify-between gap-3">
+        <div role="alert" className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg border border-red-200 mb-6 flex items-start justify-between gap-3
+                                     dark:bg-red-500/10 dark:text-red-200 dark:border-red-400/30">
           <span>{error}</span>
-          <button onClick={() => setError('')} className="text-red-500 hover:text-red-700"><X size={16} /></button>
+          <button onClick={() => setError('')} className="text-red-500 hover:text-red-700 dark:text-red-300 dark:hover:text-red-100"><X size={16} /></button>
         </div>
       )}
 
@@ -101,7 +102,7 @@ export default function ProjectsPage() {
       {!loading && projects.length > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
           <div className="relative flex-1 max-w-md">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 dark:text-surface-500" />
             <input
               type="search"
               value={query}
@@ -110,17 +111,25 @@ export default function ProjectsPage() {
               className="input pl-9 py-2"
             />
           </div>
-          <div className="inline-flex items-center p-1 rounded-lg bg-surface-100">
+          <div className="inline-flex items-center p-1 rounded-lg bg-surface-100 dark:bg-surface-800">
             <button
               onClick={() => setView('grid')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${view === 'grid' ? 'bg-white text-surface-800 shadow-soft' : 'text-surface-500 hover:text-surface-700'}`}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                view === 'grid'
+                  ? 'bg-white text-surface-800 shadow-soft dark:bg-surface-950 dark:text-surface-50'
+                  : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-100'
+              }`}
               aria-pressed={view === 'grid'}
             >
               <LayoutGrid size={14} /> Grid
             </button>
             <button
               onClick={() => setView('list')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${view === 'list' ? 'bg-white text-surface-800 shadow-soft' : 'text-surface-500 hover:text-surface-700'}`}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                view === 'list'
+                  ? 'bg-white text-surface-800 shadow-soft dark:bg-surface-950 dark:text-surface-50'
+                  : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-100'
+              }`}
               aria-pressed={view === 'list'}
             >
               <ListIcon size={14} /> List
@@ -135,19 +144,19 @@ export default function ProjectsPage() {
           <div className="card p-6 w-full max-w-md shadow-soft-lg animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h2 className="text-lg font-semibold text-surface-900">Create new project</h2>
-                <p className="text-sm text-surface-500 mt-0.5">Group related test cases into a focused workspace.</p>
+                <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-50">New project</h2>
+                <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">Group test cases into a workspace</p>
               </div>
               <button onClick={() => setShowCreate(false)} className="icon-btn" aria-label="Close"><X size={16} /></button>
             </div>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label htmlFor="p-name" className="label">Project name</label>
+                <label htmlFor="p-name" className="label">Name</label>
                 <input id="p-name" value={createName} onChange={(e) => setCreateName(e.target.value)}
                   className="input" placeholder="E.g. E-commerce Checkout" required autoFocus />
               </div>
               <div>
-                <label htmlFor="p-desc" className="label">Description <span className="text-surface-400 font-normal">(optional)</span></label>
+                <label htmlFor="p-desc" className="label">Description <span className="text-surface-400 dark:text-surface-500 font-normal">(optional)</span></label>
                 <textarea id="p-desc" value={createDesc} onChange={(e) => setCreateDesc(e.target.value)}
                   className="input resize-none" rows={3} placeholder="What is this test suite for?" />
               </div>
@@ -155,7 +164,7 @@ export default function ProjectsPage() {
                 <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary">Cancel</button>
                 <button type="submit" disabled={creating} className="btn-primary">
                   {creating && <Loader2 size={16} className="animate-spin" />}
-                  Create project
+                  Create
                 </button>
               </div>
             </form>
@@ -183,21 +192,20 @@ export default function ProjectsPage() {
       {/* Empty state */}
       {!loading && projects.length === 0 && (
         <div className="empty">
-          <div className="w-16 h-16 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-brand-50 text-brand-600 dark:bg-lime-500/10 dark:text-lime-400 flex items-center justify-center mb-4">
             <FolderOpen size={28} />
           </div>
-          <h3 className="text-lg font-semibold text-surface-800 mb-1">Create your first project</h3>
-          <p className="text-surface-500 text-sm mb-6 max-w-xs">Projects group your test cases, collections, and automation into a single workspace.</p>
+          <h3 className="text-lg font-semibold text-surface-800 dark:text-surface-100 mb-1">Create your first project</h3>
+          <p className="text-surface-500 dark:text-surface-400 text-sm mb-6 max-w-xs">Projects group test cases, collections, and automation into one workspace.</p>
           <button onClick={() => setShowCreate(true)} className="btn-primary"><Plus size={16} /> New project</button>
         </div>
       )}
 
-      {/* No search results */}
       {!loading && projects.length > 0 && filtered.length === 0 && (
         <div className="empty">
-          <Search size={28} className="text-surface-300 mb-3" />
-          <p className="text-sm text-surface-500">No projects match "{query}"</p>
-          <button onClick={() => setQuery('')} className="btn-ghost btn-sm mt-3">Clear search</button>
+          <Search size={28} className="text-surface-300 dark:text-surface-600 mb-3" />
+          <p className="text-sm text-surface-500 dark:text-surface-400">Nothing matches "{query}"</p>
+          <button onClick={() => setQuery('')} className="btn-ghost btn-sm mt-3">Clear</button>
         </div>
       )}
 
@@ -224,18 +232,18 @@ export default function ProjectsPage() {
                   <Trash2 size={15} />
                 </button>
               </div>
-              <h3 className="relative font-semibold text-surface-900 mt-4 truncate">{project.name}</h3>
+              <h3 className="relative font-semibold text-surface-900 dark:text-surface-100 mt-4 truncate">{project.name}</h3>
               {project.description && (
-                <p className="relative text-sm text-surface-500 mt-1 line-clamp-2">{project.description}</p>
+                <p className="relative text-sm text-surface-500 dark:text-surface-400 mt-1 line-clamp-2">{project.description}</p>
               )}
-              <div className="relative flex items-center gap-2 mt-4 pt-4 border-t border-surface-100">
+              <div className="relative flex items-center gap-2 mt-4 pt-4 border-t border-surface-100 dark:border-surface-800">
                 <span className="badge-muted">
-                  {project.testCaseCount} test{project.testCaseCount !== 1 ? 's' : ''}
+                  <span className="tabular-nums">{project.testCaseCount}</span> test{project.testCaseCount !== 1 ? 's' : ''}
                 </span>
                 {project.status === 'archived' && (
                   <span className="badge-warn"><Archive size={10} /> Archived</span>
                 )}
-                <ChevronRight size={16} className="ml-auto text-surface-300 group-hover:text-brand-500 transition-colors" />
+                <ChevronRight size={16} className="ml-auto text-surface-300 dark:text-surface-600 group-hover:text-brand-500 dark:group-hover:text-lime-400 transition-colors" />
               </div>
             </Link>
           ))}
@@ -244,34 +252,34 @@ export default function ProjectsPage() {
 
       {/* List view */}
       {!loading && filtered.length > 0 && view === 'list' && (
-        <div className="card divide-y divide-surface-100 overflow-hidden">
+        <div className="card divide-y divide-surface-100 dark:divide-surface-800 overflow-hidden">
           {filtered.map((project) => (
             <Link
               key={project.id}
               to={`/projects/${project.id}`}
-              className="flex items-center gap-4 px-5 py-4 hover:bg-surface-50 transition-colors group"
+              className="flex items-center gap-4 px-5 py-4 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors group"
             >
               <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradientFor(project.name)} text-white flex items-center justify-center shrink-0`}>
                 <FolderOpen size={18} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-medium text-surface-900 truncate">{project.name}</h3>
+                  <h3 className="font-medium text-surface-900 dark:text-surface-100 truncate">{project.name}</h3>
                   {project.status === 'archived' && <span className="badge-warn"><Archive size={10} /> Archived</span>}
                 </div>
-                <p className="text-xs text-surface-500 mt-0.5 truncate">
-                  {project.testCaseCount} test case{project.testCaseCount !== 1 ? 's' : ''}
+                <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 truncate">
+                  <span className="tabular-nums">{project.testCaseCount}</span> test{project.testCaseCount !== 1 ? 's' : ''}
                   {project.description && <> · {project.description}</>}
                 </p>
               </div>
               <button
                 onClick={(e) => handleDelete(e, project.id)}
-                className="icon-btn opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
+                className="icon-btn opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 dark:hover:text-red-400"
                 aria-label="Delete project"
               >
                 <Trash2 size={15} />
               </button>
-              <ChevronRight size={16} className="text-surface-300 group-hover:text-brand-500 transition-colors" />
+              <ChevronRight size={16} className="text-surface-300 dark:text-surface-600 group-hover:text-brand-500 dark:group-hover:text-lime-400 transition-colors" />
             </Link>
           ))}
         </div>
