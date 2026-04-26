@@ -77,7 +77,7 @@ export default function ExecutionsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Runs</h1>
-          <p className="page-subtitle">All executions, newest first</p>
+          <p className="page-subtitle">Every execution, newest first</p>
         </div>
         <Link to="/run-test" className="btn-primary btn-sm">
           <Play size={14} /> New run
@@ -139,11 +139,13 @@ export default function ExecutionsPage() {
           <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 dark:bg-lime-500/10 dark:text-lime-400 flex items-center justify-center mb-4">
             <Play size={22} />
           </div>
-          <h3 className="text-lg font-semibold text-surface-800 dark:text-surface-100 mb-1">No runs yet</h3>
+          <h3 className="text-lg font-semibold text-surface-800 dark:text-surface-100 mb-1">
+            {query ? 'No runs match your search' : 'Nothing has run yet'}
+          </h3>
           <p className="text-surface-500 dark:text-surface-400 text-sm max-w-xs mb-6">
-            {query ? `Nothing matches "${query}".` : 'Run something to start a history.'}
+            {query ? `Try a different search term.` : 'Open a project and kick off a test run — its history shows up here.'}
           </p>
-          <Link to="/run-test" className="btn-primary"><Play size={14} /> New run</Link>
+          <Link to="/projects" className="btn-primary"><Play size={14} /> Pick a project</Link>
         </div>
       )}
 

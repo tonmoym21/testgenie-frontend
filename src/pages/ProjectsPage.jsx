@@ -83,7 +83,7 @@ export default function ProjectsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Projects</h1>
-          <p className="page-subtitle">Test workspaces</p>
+          <p className="page-subtitle">Pick a workspace or start a new one</p>
         </div>
         <button onClick={() => setShowCreate(true)} className="btn-primary">
           <Plus size={16} /> New project
@@ -195,17 +195,17 @@ export default function ProjectsPage() {
           <div className="w-16 h-16 rounded-2xl bg-brand-50 text-brand-600 dark:bg-lime-500/10 dark:text-lime-400 flex items-center justify-center mb-4">
             <FolderOpen size={28} />
           </div>
-          <h3 className="text-lg font-semibold text-surface-800 dark:text-surface-100 mb-1">Create your first project</h3>
-          <p className="text-surface-500 dark:text-surface-400 text-sm mb-6 max-w-xs">Projects group test cases, collections, and automation into one workspace.</p>
-          <button onClick={() => setShowCreate(true)} className="btn-primary"><Plus size={16} /> New project</button>
+          <h3 className="text-lg font-semibold text-surface-800 dark:text-surface-100 mb-1">Spin up your first project</h3>
+          <p className="text-surface-500 dark:text-surface-400 text-sm mb-6 max-w-xs">A project is one workspace for a feature or product — its test cases, runs, and automation all live together.</p>
+          <button onClick={() => setShowCreate(true)} className="btn-primary"><Plus size={16} /> Create project</button>
         </div>
       )}
 
       {!loading && projects.length > 0 && filtered.length === 0 && (
         <div className="empty">
           <Search size={28} className="text-surface-300 dark:text-surface-600 mb-3" />
-          <p className="text-sm text-surface-500 dark:text-surface-400">Nothing matches "{query}"</p>
-          <button onClick={() => setQuery('')} className="btn-ghost btn-sm mt-3">Clear</button>
+          <p className="text-sm text-surface-500 dark:text-surface-400">No project name like "{query}".</p>
+          <button onClick={() => setQuery('')} className="btn-ghost btn-sm mt-3">Clear search</button>
         </div>
       )}
 

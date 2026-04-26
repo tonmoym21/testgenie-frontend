@@ -8,9 +8,9 @@ import {
 import ForgeMark from '../components/ForgeMark';
 
 const HIGHLIGHTS = [
-  { icon: Zap,         title: 'Run UI + API tests',       text: 'Author once, execute in Playwright or through our API runner.' },
-  { icon: Sparkles,    title: 'AI-assisted coverage',     text: 'Detect gaps, duplicates, and risky edges automatically.' },
-  { icon: ShieldCheck, title: 'Trusted by QA teams',      text: 'Role-based access, Jira sync, and environment isolation.' },
+  { icon: Zap,         title: 'UI and API in one place',  text: 'Author once. Run in Playwright or hit endpoints directly.' },
+  { icon: Sparkles,    title: 'Coverage gaps, found',     text: 'AI flags missing edges and duplicate cases as you work.' },
+  { icon: ShieldCheck, title: 'Built for real teams',     text: 'Role-based access, Jira sync, environment isolation.' },
 ];
 
 export default function LoginPage() {

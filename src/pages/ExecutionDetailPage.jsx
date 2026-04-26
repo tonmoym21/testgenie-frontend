@@ -29,8 +29,9 @@ export default function ExecutionDetailPage() {
     return (
       <div className="page">
         <div className="empty">
-          <h3 className="text-lg font-semibold text-surface-800 dark:text-surface-100 mb-1">Execution not found</h3>
-          <Link to="/executions" className="btn-secondary mt-4"><ArrowLeft size={14} /> Back to executions</Link>
+          <h3 className="text-lg font-semibold text-surface-800 dark:text-surface-100 mb-1">This run is gone</h3>
+          <p className="text-surface-500 dark:text-surface-400 text-sm mt-1">It was deleted, or the link is wrong.</p>
+          <Link to="/executions" className="btn-secondary mt-4"><ArrowLeft size={14} /> Back to runs</Link>
         </div>
       </div>
     );
