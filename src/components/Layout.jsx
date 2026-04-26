@@ -28,7 +28,7 @@ const NAV_GROUPS = [
     items: [
       { path: '/dashboard', label: 'Dashboards', icon: BarChart3, match: ['/dashboard'] },
       { key: 'projects', label: 'Projects', icon: FolderOpen, parent: true,
-        match: ['/projects', '/test-cases', '/test-runs', '/test-plans', '/reports', '/executions'] },
+        match: ['/projects', '/test-cases', '/test-runs', '/test-plans', '/reports', '/executions', '/stories', '/automation'] },
       { path: '/integrations', label: 'Integrations', icon: Puzzle, match: ['/integrations', '/jira'] },
       { path: '/settings', label: 'Settings', icon: Settings, match: ['/settings', '/team', '/environments', '/globals'] },
     ],

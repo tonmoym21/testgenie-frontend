@@ -150,12 +150,6 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label htmlFor="password" className="label mb-0">Password</label>
-                {!isRegister && (
-                  <button type="button" className="text-xs text-brand-600 hover:text-brand-700 font-medium
-                                                   dark:text-lime-400 dark:hover:text-lime-300">
-                    Forgot password?
-                  </button>
-                )}
               </div>
               <div className="relative">
                 <input

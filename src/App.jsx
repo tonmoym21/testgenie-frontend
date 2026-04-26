@@ -10,11 +10,9 @@ import ApiDashboardPage from './pages/ApiDashboardPage';
 import AutomationDashboardPage from './pages/AutomationDashboardPage';
 import RunReportDetailPage from './pages/RunReportDetailPage';
 import ProjectsPage from './pages/ProjectsPage';
-import ProjectDetailPage from './pages/ProjectDetailPage';
 import ProjectTestCasesPage from './pages/ProjectTestCasesPage';
 import ExecutionsPage from './pages/ExecutionsPage';
 import ExecutionDetailPage from './pages/ExecutionDetailPage';
-import RunTestPage from './pages/RunTestPage';
 import CollectionsPage from './pages/CollectionsPage';
 import CollectionDetailPage from './pages/CollectionDetailPage';
 import EnvironmentsPage from './pages/EnvironmentsPage';
@@ -70,7 +68,6 @@ export default function App() {
       <Route path="/projects/:projectId/test-cases" element={<ProtectedRoute><ProjectTestCasesPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/test-plans" element={<ProtectedRoute><TestPlansPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
-      <Route path="/projects/:projectId/legacy" element={<ProtectedRoute><ProjectDetailPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/stories/new" element={<ProtectedRoute><CreateStoryPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/stories/:storyId" element={<ProtectedRoute><StoryDetailPage /></ProtectedRoute>} />
@@ -102,7 +99,7 @@ export default function App() {
       <Route path="/globals" element={<ProtectedRoute><GlobalsPage /></ProtectedRoute>} />
 
       {/* Legacy / other */}
-      <Route path="/run-test" element={<ProtectedRoute><RunTestPage /></ProtectedRoute>} />
+      <Route path="/run-test" element={<Navigate to="/projects" replace />} />
       <Route path="/collections" element={<ProtectedRoute><CollectionsPage /></ProtectedRoute>} />
       <Route path="/collections/:collectionId" element={<ProtectedRoute><CollectionDetailPage /></ProtectedRoute>} />
       <Route path="/schedules" element={<ProtectedRoute><SchedulesPage /></ProtectedRoute>} />

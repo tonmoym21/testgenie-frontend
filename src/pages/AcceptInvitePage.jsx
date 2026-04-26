@@ -192,10 +192,10 @@ export default function AcceptInvitePage() {
   // Loading state
   if (loading || mode === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-50">
+      <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-surface-950">
         <div className="text-center">
           <Loader2 className="w-8 h-8 text-brand-600 animate-spin mx-auto mb-4" />
-          <p className="text-surface-600">Loading invite...</p>
+          <p className="text-surface-600 dark:text-surface-300">Loading invite...</p>
         </div>
       </div>
     );
@@ -204,10 +204,10 @@ export default function AcceptInvitePage() {
   // Accepting state
   if (mode === 'accepting') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-50">
+      <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-surface-950">
         <div className="text-center">
           <Loader2 className="w-8 h-8 text-brand-600 animate-spin mx-auto mb-4" />
-          <p className="text-surface-600">Joining organization...</p>
+          <p className="text-surface-600 dark:text-surface-300">Joining organization...</p>
         </div>
       </div>
     );
@@ -216,15 +216,15 @@ export default function AcceptInvitePage() {
   // Success state
   if (mode === 'success') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-50">
+      <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-surface-950">
         <div className="max-w-md w-full mx-4">
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+          <div className="bg-white dark:bg-surface-900 dark:ring-1 dark:ring-white/5 rounded-xl shadow-lg p-8 text-center">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-surface-900 mb-2">Welcome!</h1>
-            <p className="text-surface-600 mb-4">
+            <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-50 mb-2">Welcome!</h1>
+            <p className="text-surface-600 dark:text-surface-300 mb-4">
               You've successfully joined <span className="font-medium">{inviteInfo?.organizationName}</span>
             </p>
-            <p className="text-sm text-surface-500">Redirecting to dashboard...</p>
+            <p className="text-sm text-surface-500 dark:text-surface-400">Redirecting to dashboard...</p>
           </div>
         </div>
       </div>
@@ -234,12 +234,12 @@ export default function AcceptInvitePage() {
   // Error state (only for non-recoverable errors like invalid/expired invite)
   if (mode === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-50">
+      <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-surface-950">
         <div className="max-w-md w-full mx-4">
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+          <div className="bg-white dark:bg-surface-900 dark:ring-1 dark:ring-white/5 rounded-xl shadow-lg p-8 text-center">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-surface-900 mb-2">Unable to Join</h1>
-            <p className="text-surface-600 mb-6">{error}</p>
+            <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-50 mb-2">Unable to Join</h1>
+            <p className="text-surface-600 dark:text-surface-300 mb-6">{error}</p>
             <div className="flex justify-center gap-4">
               <Link
                 to="/login"
@@ -256,24 +256,24 @@ export default function AcceptInvitePage() {
 
   // Register/Login form
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface-50 py-12 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-surface-950 py-12 px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="bg-white dark:bg-surface-900 dark:ring-1 dark:ring-white/5 rounded-xl shadow-lg p-8">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="w-12 h-12 bg-brand-100 rounded-xl flex items-center justify-center mx-auto mb-4">
               <Building2 className="w-6 h-6 text-brand-600" />
             </div>
-            <h1 className="text-2xl font-bold text-surface-900">Join {inviteInfo?.organizationName}</h1>
-            <p className="text-surface-500 mt-2">
+            <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-50">Join {inviteInfo?.organizationName}</h1>
+            <p className="text-surface-500 dark:text-surface-400 mt-2">
               You've been invited as <span className="font-medium capitalize">{inviteInfo?.role}</span>
             </p>
           </div>
 
           {/* Email badge */}
-          <div className="flex items-center justify-center gap-2 mb-6 px-4 py-2 bg-surface-50 rounded-lg">
+          <div className="flex items-center justify-center gap-2 mb-6 px-4 py-2 bg-surface-50 dark:bg-surface-950 rounded-lg">
             <Mail size={16} className="text-surface-400" />
-            <span className="text-sm text-surface-600">{inviteInfo?.email}</span>
+            <span className="text-sm text-surface-600 dark:text-surface-300">{inviteInfo?.email}</span>
           </div>
 
           {/* Mode tabs */}
@@ -281,7 +281,7 @@ export default function AcceptInvitePage() {
             <button
               onClick={() => { setMode('register'); setFormError(''); }}
               className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-                mode === 'register' ? 'bg-brand-100 text-brand-700' : 'text-surface-500 hover:bg-surface-100'
+                mode === 'register' ? 'bg-brand-100 text-brand-700' : 'text-surface-500 dark:text-surface-400 hover:bg-surface-100'
               }`}
             >
               Create Account
@@ -289,7 +289,7 @@ export default function AcceptInvitePage() {
             <button
               onClick={() => { setMode('login'); setFormError(''); }}
               className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-                mode === 'login' ? 'bg-brand-100 text-brand-700' : 'text-surface-500 hover:bg-surface-100'
+                mode === 'login' ? 'bg-brand-100 text-brand-700' : 'text-surface-500 dark:text-surface-400 hover:bg-surface-100'
               }`}
             >
               Sign In
@@ -307,16 +307,16 @@ export default function AcceptInvitePage() {
           {mode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-surface-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-surface-700 dark:text-surface-200 mb-1">Email</label>
                 <input
                   type="email"
                   value={email}
                   disabled
-                  className="w-full px-4 py-2 border border-surface-300 rounded-lg bg-surface-50 text-surface-500"
+                  className="w-full px-4 py-2 border border-surface-300 rounded-lg bg-surface-50 dark:bg-surface-950 text-surface-500 dark:text-surface-400"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-surface-700 mb-1">Password</label>
+                <label className="block text-sm font-medium text-surface-700 dark:text-surface-200 mb-1">Password</label>
                 <input
                   type="password"
                   value={password}
@@ -327,7 +327,7 @@ export default function AcceptInvitePage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-surface-700 mb-1">Confirm Password</label>
+                <label className="block text-sm font-medium text-surface-700 dark:text-surface-200 mb-1">Confirm Password</label>
                 <input
                   type="password"
                   value={confirmPassword}
@@ -358,7 +358,7 @@ export default function AcceptInvitePage() {
           {mode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-surface-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-surface-700 dark:text-surface-200 mb-1">Email</label>
                 <input
                   type="email"
                   value={email}
@@ -367,7 +367,7 @@ export default function AcceptInvitePage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-surface-700 mb-1">Password</label>
+                <label className="block text-sm font-medium text-surface-700 dark:text-surface-200 mb-1">Password</label>
                 <input
                   type="password"
                   value={password}

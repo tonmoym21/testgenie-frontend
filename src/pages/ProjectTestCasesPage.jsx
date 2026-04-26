@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../services/api';
 import {
   ArrowLeft, Plus, Loader2, Trash2, Pencil, X, Search, Folder, FolderOpen,
-  FolderPlus, ChevronRight, ChevronDown, Download, Sparkles, BookOpen,
+  FolderPlus, ChevronRight, ChevronDown, Download, BookOpen,
   Library, FileText, MoreHorizontal, Shield, Upload, PlayCircle, Link as LinkIcon,
 } from 'lucide-react';
 import CreateTestCaseModal from '../components/CreateTestCaseModal';
@@ -513,9 +513,6 @@ export default function ProjectTestCasesPage() {
             </button>
             <button className="btn-secondary btn-sm">
               <Download size={14} /> Export
-            </button>
-            <button className="btn-primary btn-sm" disabled title="Generate with AI — coming soon">
-              <Sparkles size={14} /> Generate with AI
             </button>
             <div className="relative inline-flex">
               <button className="btn-primary btn-sm rounded-r-none" onClick={() => setShowCreate(true)}>
