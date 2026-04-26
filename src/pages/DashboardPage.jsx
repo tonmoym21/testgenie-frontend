@@ -99,8 +99,8 @@ function ActivityFeed({ activities }) {
     return (
       <div className="text-center py-10 text-surface-400 dark:text-surface-500">
         <Users size={28} className="mx-auto mb-2 opacity-40" />
-        <p className="text-sm">No activity yet</p>
-        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">Activity shows up after the first run</p>
+        <p className="text-sm">Quiet here for now</p>
+        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">The team's runs and edits show up here as they happen.</p>
       </div>
     );
   }
@@ -207,7 +207,7 @@ export default function DashboardPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Overview</h1>
-          <p className="page-subtitle">Last 30 days · live</p>
+          <p className="page-subtitle">Last 30 days, refreshed live</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -220,7 +220,7 @@ export default function DashboardPage() {
             Refresh
           </button>
           <Link to="/projects" className="btn-primary btn-sm">
-            <Sparkles size={14} /> New test
+            <Sparkles size={14} /> Start a test
           </Link>
         </div>
       </div>
