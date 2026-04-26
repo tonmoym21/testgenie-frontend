@@ -11,10 +11,10 @@ import ImportTestCasesModal from '../components/ImportTestCasesModal';
 import { setCurrentProjectId } from '../utils/currentProject';
 
 const PRIORITY_STYLES = {
-  critical: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/15',
-  high:     'bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-600/15',
-  medium:   'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/15',
-  low:      'bg-surface-100 text-surface-600 ring-1 ring-inset ring-surface-300/40',
+  critical: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/15 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/20',
+  high:     'bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-600/15 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20',
+  medium:   'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/15 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20',
+  low:      'bg-surface-100 text-surface-600 ring-1 ring-inset ring-surface-300/40 dark:bg-surface-800 dark:text-surface-300 dark:ring-surface-700',
 };
 
 // Build a tree from a flat array of folders keyed by parent_id.
@@ -73,7 +73,7 @@ function FolderNode({ node, depth, expanded, toggle, selected, onSelect, countFo
             <MoreHorizontal size={14} />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-1 bg-white border border-surface-200 rounded-lg shadow-soft-lg z-20 w-40 py-1 text-sm">
+            <div className="absolute right-0 top-full mt-1 bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg shadow-soft-lg z-20 w-40 py-1 text-sm">
               <button className="w-full text-left px-3 py-1.5 hover:bg-surface-50" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onAddChild(node.id); }}>Add sub-folder</button>
               <button className="w-full text-left px-3 py-1.5 hover:bg-surface-50" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRename(node); }}>Rename</button>
               <button className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(node); }}>Delete</button>
@@ -492,7 +492,7 @@ export default function ProjectTestCasesPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* Page header */}
-      <div className="px-6 pt-5 pb-3 border-b border-surface-200/70 bg-white/80">
+      <div className="px-6 pt-5 pb-3 border-b border-surface-200/70 dark:border-surface-800 bg-white/80 dark:bg-surface-950/80">
         <Link to={`/projects/${projectId}`} className="inline-flex items-center gap-1.5 text-xs text-surface-500 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-100 mb-2 transition-colors">
           <ArrowLeft size={12} /> Back to project
         </Link>
@@ -529,7 +529,7 @@ export default function ProjectTestCasesPage() {
                 <ChevronDown size={14} />
               </button>
               {createMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-surface-200 rounded-lg shadow-soft-lg z-30 py-1 text-sm">
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg shadow-soft-lg z-30 py-1 text-sm">
                   <button
                     onClick={() => { setCreateMenuOpen(false); setShowCreate(true); }}
                     className="w-full text-left px-3 py-2 hover:bg-surface-50 flex items-start gap-2"
@@ -560,7 +560,7 @@ export default function ProjectTestCasesPage() {
                       <span className="block text-xs text-surface-500">Import a Postman collection and auto-generate cases.</span>
                     </span>
                   </button>
-                  <div className="border-t border-surface-200/70 my-1" />
+                  <div className="border-t border-surface-200/70 dark:border-surface-800 my-1" />
                   <button
                     onClick={() => { setCreateMenuOpen(false); setShowImport(true); }}
                     className="w-full text-left px-3 py-2 hover:bg-surface-50 flex items-start gap-2"
@@ -588,8 +588,8 @@ export default function ProjectTestCasesPage() {
       {/* Workspace split */}
       <div className="flex-1 flex min-h-0">
         {/* Folder tree */}
-        <aside className="w-72 border-r border-surface-200/70 bg-white overflow-y-auto">
-          <div className="flex items-center justify-between px-3 py-3 border-b border-surface-200/70 sticky top-0 bg-white z-10">
+        <aside className="w-72 border-r border-surface-200/70 dark:border-surface-800 bg-white dark:bg-surface-900 overflow-y-auto">
+          <div className="flex items-center justify-between px-3 py-3 border-b border-surface-200/70 dark:border-surface-800 sticky top-0 bg-white dark:bg-surface-900 z-10">
             <span className="text-xs font-semibold uppercase tracking-wider text-surface-500">Folders</span>
             <button className="icon-btn" title="New folder" onClick={handleAddRootFolder}>
               <FolderPlus size={15} />
@@ -625,7 +625,7 @@ export default function ProjectTestCasesPage() {
         {/* Test case list */}
         <section className="flex-1 min-w-0 overflow-y-auto bg-surface-50">
           {/* Toolbar */}
-          <div className="sticky top-0 z-10 bg-white border-b border-surface-200/70 px-5 py-3 flex items-center gap-3">
+          <div className="sticky top-0 z-10 bg-white dark:bg-surface-900 border-b border-surface-200/70 dark:border-surface-800 px-5 py-3 flex items-center gap-3">
             <div className="relative flex-1 max-w-md">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
               <input
@@ -666,7 +666,7 @@ export default function ProjectTestCasesPage() {
           )}
 
           {/* Column header */}
-          <div className="px-5 py-2 bg-surface-100/60 border-b border-surface-200/70 grid grid-cols-[24px_60px_1fr_120px_140px_120px_80px] gap-3 items-center text-[11px] font-semibold uppercase tracking-wider text-surface-500">
+          <div className="px-5 py-2 bg-surface-100/60 border-b border-surface-200/70 dark:border-surface-800 grid grid-cols-[24px_60px_1fr_120px_140px_120px_80px] gap-3 items-center text-[11px] font-semibold uppercase tracking-wider text-surface-500">
             <input
               type="checkbox"
               checked={visibleTestCases.length > 0 && visibleTestCases.every((tc) => selectedIds.has(tc.id))}
@@ -701,7 +701,7 @@ export default function ProjectTestCasesPage() {
           )}
 
           {!loading && visibleTestCases.length > 0 && (
-            <div className="divide-y divide-surface-200/70 bg-white">
+            <div className="divide-y divide-surface-200/70 dark:divide-surface-800 bg-white dark:bg-surface-900">
               {visibleTestCases.map((tc) => {
                 const folder = folders.find((f) => f.id === tc.folderId);
                 const assignee = members.find((m) => m.id === tc.assigneeUserId);
@@ -730,7 +730,7 @@ export default function ProjectTestCasesPage() {
                       <select
                         value={tc.folderId ?? ''}
                         onChange={(e) => handleMoveTestCase(tc, e.target.value ? parseInt(e.target.value, 10) : null)}
-                        className="text-xs border border-surface-200 rounded-md px-2 py-1 bg-white w-full"
+                        className="text-xs border border-surface-200 dark:border-surface-700 rounded-md px-2 py-1 bg-white dark:bg-surface-800 dark:text-surface-100 w-full"
                       >
                         <option value="">Unassigned</option>
                         {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -801,8 +801,8 @@ export default function ProjectTestCasesPage() {
       {/* Project picker (Copy to / Move to) */}
       {projectPicker && (
         <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setProjectPicker(null)}>
-          <div className="bg-white rounded-xl shadow-soft-lg w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-surface-200/70">
+          <div className="bg-white dark:bg-surface-900 rounded-xl shadow-soft-lg w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-surface-200/70 dark:border-surface-800">
               <h3 className="font-semibold text-surface-900">
                 {projectPicker.mode === 'move' ? 'Move' : 'Copy'} {selectedIds.size} test case{selectedIds.size === 1 ? '' : 's'} to…
               </h3>
@@ -886,8 +886,8 @@ export default function ProjectTestCasesPage() {
       {/* Add to Test Run modal */}
       {showAddToRun && (
         <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowAddToRun(false)}>
-          <div className="bg-white rounded-xl shadow-soft-lg w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-surface-200/70">
+          <div className="bg-white dark:bg-surface-900 rounded-xl shadow-soft-lg w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-surface-200/70 dark:border-surface-800">
               <h3 className="font-semibold text-surface-900">Add {selectedIds.size} test case{selectedIds.size === 1 ? '' : 's'} to a run</h3>
               <button onClick={() => setShowAddToRun(false)} className="icon-btn"><X size={16}/></button>
             </div>
@@ -920,7 +920,7 @@ export default function ProjectTestCasesPage() {
                 </ul>
               )}
             </div>
-            <div className="px-5 py-3 border-t border-surface-200/70 flex justify-between">
+            <div className="px-5 py-3 border-t border-surface-200/70 dark:border-surface-800 flex justify-between">
               <button
                 onClick={() => { setShowAddToRun(false); navigate(`/projects/${projectId}/test-runs/new?caseIds=${Array.from(selectedIds).join(',')}`); }}
                 className="btn-secondary btn-sm"

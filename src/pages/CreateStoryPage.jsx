@@ -32,7 +32,7 @@ export default function CreateStoryPage() {
 
   return (
     <div className="page max-w-3xl">
-      <Link to={'/projects/' + projectId + '/stories'} className="inline-flex items-center gap-1.5 text-sm text-surface-500 hover:text-surface-800 mb-4 transition-colors">
+      <Link to={'/projects/' + projectId + '/stories'} className="inline-flex items-center gap-1.5 text-sm text-surface-500 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-100 mb-4 transition-colors">
         <ArrowLeft size={14} /> Back to stories
       </Link>
       <div className="page-header">
@@ -44,7 +44,7 @@ export default function CreateStoryPage() {
 
       <form onSubmit={handleSubmit} className="card p-6 space-y-5">
         {error && (
-          <div role="alert" className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg border border-red-200">{error}</div>
+          <div role="alert" className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg border border-red-200 dark:bg-red-500/10 dark:text-red-200 dark:border-red-400/30">{error}</div>
         )}
 
         <div>
@@ -58,7 +58,7 @@ export default function CreateStoryPage() {
           <textarea value={description} onChange={(e) => setDescription(e.target.value)}
             placeholder="Paste the full user story here including acceptance criteria..."
             className="input resize-y min-h-[200px]" maxLength={10240} />
-          <p className="text-xs text-surface-400 mt-1 text-right">{description.length}/10,240 characters (min 20)</p>
+          <p className="text-xs text-surface-400 dark:text-surface-500 mt-1 text-right tabular-nums">{description.length}/10,240 characters (min 20)</p>
         </div>
 
         <div className="flex gap-4 items-end flex-wrap">

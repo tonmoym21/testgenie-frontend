@@ -24,18 +24,18 @@ const PRIORITY_TONES = {
 
 function SummaryCard({ label, value, sublabel, icon: Icon, tone = 'brand' }) {
   const tones = {
-    brand:   'from-brand-500/10 to-brand-500/0 text-brand-600 ring-brand-600/10',
-    success: 'from-emerald-500/10 to-emerald-500/0 text-emerald-600 ring-emerald-600/10',
-    warn:    'from-amber-500/10 to-amber-500/0 text-amber-600 ring-amber-600/10',
-    purple:  'from-purple-500/10 to-purple-500/0 text-purple-600 ring-purple-600/10',
+    brand:   'from-brand-500/10 to-brand-500/0 text-brand-600 ring-brand-600/10 dark:from-brand-500/15 dark:text-brand-300 dark:ring-brand-400/20',
+    success: 'from-emerald-500/10 to-emerald-500/0 text-emerald-600 ring-emerald-600/10 dark:from-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/20',
+    warn:    'from-amber-500/10 to-amber-500/0 text-amber-600 ring-amber-600/10 dark:from-amber-500/15 dark:text-amber-300 dark:ring-amber-400/20',
+    purple:  'from-purple-500/10 to-purple-500/0 text-purple-600 ring-purple-600/10 dark:from-purple-500/15 dark:text-purple-300 dark:ring-purple-400/20',
   };
   return (
     <div className="card p-5">
       <div className="flex items-start justify-between">
         <div className="min-w-0">
-          <p className="text-sm text-surface-500">{label}</p>
-          <p className="text-[28px] font-semibold text-surface-900 tracking-tight mt-1 leading-none">{value}</p>
-          {sublabel && <p className="text-xs text-surface-400 mt-2">{sublabel}</p>}
+          <p className="text-sm text-surface-500 dark:text-surface-400">{label}</p>
+          <p className="text-[28px] font-semibold text-surface-900 dark:text-surface-50 tracking-tight mt-1 leading-none tabular-nums">{value}</p>
+          {sublabel && <p className="text-xs text-surface-400 dark:text-surface-500 mt-2">{sublabel}</p>}
         </div>
         <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${tones[tone]} ring-1 ring-inset flex items-center justify-center`}>
           <Icon size={20} />
@@ -58,7 +58,7 @@ function SkeletonCard({ height = 'h-28' }) {
 function ResultsBar({ results }) {
   const total = Object.values(results || {}).reduce((a, b) => a + b, 0);
   if (total === 0) {
-    return <div className="text-sm text-surface-400 py-6 text-center">No results from closed runs yet.</div>;
+    return <div className="text-sm text-surface-400 dark:text-surface-500 py-6 text-center">No results from closed runs yet.</div>;
   }
   const items = [
     { key: 'passed',   label: 'Passed',   tone: 'bg-emerald-500' },
@@ -66,11 +66,11 @@ function ResultsBar({ results }) {
     { key: 'blocked',  label: 'Blocked',  tone: 'bg-amber-500' },
     { key: 'skipped',  label: 'Skipped',  tone: 'bg-surface-400' },
     { key: 'retest',   label: 'Retest',   tone: 'bg-purple-500' },
-    { key: 'untested', label: 'Untested', tone: 'bg-surface-300' },
+    { key: 'untested', label: 'Untested', tone: 'bg-surface-300 dark:bg-surface-600' },
   ];
   return (
     <>
-      <div className="flex h-3 rounded-full overflow-hidden ring-1 ring-surface-200">
+      <div className="flex h-3 rounded-full overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700">
         {items.map((it) => {
           const count = results[it.key] || 0;
           if (count === 0) return null;
@@ -80,10 +80,10 @@ function ResultsBar({ results }) {
       </div>
       <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4">
         {items.map((it) => (
-          <li key={it.key} className="flex items-center gap-2 text-xs text-surface-600">
+          <li key={it.key} className="flex items-center gap-2 text-xs">
             <span className={`w-2.5 h-2.5 rounded-sm ${it.tone}`} />
-            <span className="text-surface-500">{it.label}</span>
-            <span className="ml-auto font-semibold text-surface-800">{results[it.key] || 0}</span>
+            <span className="text-surface-500 dark:text-surface-400">{it.label}</span>
+            <span className="ml-auto font-semibold text-surface-800 dark:text-surface-100 tabular-nums">{results[it.key] || 0}</span>
           </li>
         ))}
       </ul>
@@ -94,7 +94,7 @@ function ResultsBar({ results }) {
 function TypeDistribution({ dist }) {
   const total = Object.values(dist || {}).reduce((a, b) => a + b, 0);
   if (total === 0) {
-    return <div className="text-sm text-surface-400 py-6 text-center">No test cases to categorize.</div>;
+    return <div className="text-sm text-surface-400 dark:text-surface-500 py-6 text-center">No test cases to categorize.</div>;
   }
   return (
     <ul className="space-y-3">
@@ -103,10 +103,10 @@ function TypeDistribution({ dist }) {
         return (
           <li key={key}>
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="capitalize text-surface-700 font-medium">{key}</span>
-              <span className="text-surface-500">{count} · {pct}%</span>
+              <span className="capitalize text-surface-700 dark:text-surface-200 font-medium">{key}</span>
+              <span className="text-surface-500 dark:text-surface-400 tabular-nums">{count} · {pct}%</span>
             </div>
-            <div className="h-2 rounded-full bg-surface-100 overflow-hidden">
+            <div className="h-2 rounded-full bg-surface-100 dark:bg-surface-800 overflow-hidden">
               <div className={`h-full ${PRIORITY_TONES[key] || 'bg-brand-500'}`} style={{ width: `${pct}%` }} />
             </div>
           </li>
@@ -118,7 +118,7 @@ function TypeDistribution({ dist }) {
 
 function TrendChart({ points }) {
   if (!points || points.length === 0) {
-    return <div className="text-sm text-surface-400 py-6 text-center">No activity in this range.</div>;
+    return <div className="text-sm text-surface-400 dark:text-surface-500 py-6 text-center">No activity in this range.</div>;
   }
   const width = 640;
   const height = 140;
@@ -145,7 +145,7 @@ function TrendChart({ points }) {
         <path d={areaPath} fill="url(#trendFill)" />
         <path d={path} fill="none" stroke="rgb(99 102 241)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <div className="flex items-center justify-between text-[11px] text-surface-400 mt-1 px-1">
+      <div className="flex items-center justify-between text-[11px] text-surface-400 dark:text-surface-500 mt-1 px-1 tabular-nums">
         <span>{points[0]?.date}</span>
         <span>Peak: {max}</span>
         <span>{points[points.length - 1]?.date}</span>
@@ -167,9 +167,9 @@ function StatisticsCards({ insights }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
       {items.map((it) => (
-        <div key={it.label} className="rounded-lg bg-surface-50 ring-1 ring-surface-200/60 px-3 py-2.5">
-          <p className="text-[11px] text-surface-500 uppercase tracking-wide">{it.label}</p>
-          <p className="text-lg font-semibold text-surface-900 mt-0.5">{it.value}</p>
+        <div key={it.label} className="rounded-lg bg-surface-50 ring-1 ring-surface-200/60 px-3 py-2.5 dark:bg-surface-800/50 dark:ring-surface-700">
+          <p className="text-[11px] text-surface-500 dark:text-surface-400 uppercase tracking-wide">{it.label}</p>
+          <p className="text-lg font-semibold text-surface-900 dark:text-surface-50 mt-0.5 tabular-nums">{it.value}</p>
         </div>
       ))}
     </div>
@@ -179,30 +179,30 @@ function StatisticsCards({ insights }) {
 function DefectsPanel({ defects, projectId }) {
   if (!defects || defects.total === 0) {
     return (
-      <div className="text-center py-6 text-surface-400">
+      <div className="text-center py-6 text-surface-400 dark:text-surface-500">
         <Bug size={22} className="mx-auto mb-2 opacity-50" />
         <p className="text-sm">No defects linked yet</p>
-        <p className="text-xs text-surface-400 mt-1">Link a Jira issue to a failing test case to track defects.</p>
+        <p className="text-xs mt-1">Link a Jira issue to a failing test case to track defects.</p>
       </div>
     );
   }
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between text-sm">
-        <span className="text-surface-600">Open (failing)</span>
-        <span className="font-semibold text-red-600">{defects.open}</span>
+        <span className="text-surface-600 dark:text-surface-300">Open (failing)</span>
+        <span className="font-semibold text-red-600 dark:text-red-400 tabular-nums">{defects.open}</span>
       </div>
       <div className="flex items-center justify-between text-sm">
-        <span className="text-surface-600">Resolved (passing)</span>
-        <span className="font-semibold text-emerald-600">{defects.resolved}</span>
+        <span className="text-surface-600 dark:text-surface-300">Resolved (passing)</span>
+        <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{defects.resolved}</span>
       </div>
-      <div className="flex items-center justify-between text-sm pt-2 border-t border-surface-100">
-        <span className="text-surface-500">Total linked</span>
-        <span className="font-semibold text-surface-900">{defects.total}</span>
+      <div className="flex items-center justify-between text-sm pt-2 border-t border-surface-100 dark:border-surface-800">
+        <span className="text-surface-500 dark:text-surface-400">Total linked</span>
+        <span className="font-semibold text-surface-900 dark:text-surface-50 tabular-nums">{defects.total}</span>
       </div>
       <Link
         to={`/projects/${projectId}/test-cases`}
-        className="text-xs text-brand-600 hover:text-brand-700 font-medium inline-flex items-center gap-1 mt-2"
+        className="text-xs text-brand-600 hover:text-brand-700 dark:text-lime-400 dark:hover:text-lime-300 font-medium inline-flex items-center gap-1 mt-2"
       >
         View linked test cases →
       </Link>
@@ -218,17 +218,17 @@ function ViewsDropdown({ open, onToggle }) {
       </button>
       {open && (
         <div role="menu" className="absolute right-0 mt-2 w-56 card p-1 shadow-soft-lg z-30">
-          <button className="w-full text-left text-sm px-3 py-2 rounded-md bg-brand-50 text-brand-700 font-medium">
+          <button className="w-full text-left text-sm px-3 py-2 rounded-md bg-brand-50 text-brand-700 font-medium dark:bg-lime-500/10 dark:text-lime-300">
             Default view
           </button>
-          <button disabled className="w-full text-left text-sm px-3 py-2 rounded-md text-surface-400 cursor-not-allowed flex items-center gap-2">
+          <button disabled className="w-full text-left text-sm px-3 py-2 rounded-md text-surface-400 dark:text-surface-500 cursor-not-allowed flex items-center gap-2">
             <Plus size={14} /> Create view
             <span className="ml-auto text-[10px] uppercase tracking-wide">Soon</span>
           </button>
-          <button disabled className="w-full text-left text-sm px-3 py-2 rounded-md text-surface-400 cursor-not-allowed">
+          <button disabled className="w-full text-left text-sm px-3 py-2 rounded-md text-surface-400 dark:text-surface-500 cursor-not-allowed">
             Duplicate
           </button>
-          <button disabled className="w-full text-left text-sm px-3 py-2 rounded-md text-surface-400 cursor-not-allowed">
+          <button disabled className="w-full text-left text-sm px-3 py-2 rounded-md text-surface-400 dark:text-surface-500 cursor-not-allowed">
             Delete
           </button>
         </div>
@@ -285,16 +285,16 @@ export default function InsightsPage() {
       <div className="page-header">
         <div className="min-w-0">
           <h1 className="page-title flex items-center gap-2">
-            <Activity size={22} className="text-brand-600" />
+            <Activity size={22} className="text-brand-600 dark:text-lime-400" />
             Project Insights
           </h1>
           <p className="page-subtitle">
-            {project?.name ? `Overview for ${project.name}` : 'Overview of project activity and coverage.'}
+            {project?.name ? `Overview for ${project.name}` : 'Project activity and coverage'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Time range */}
-          <div className="inline-flex rounded-lg ring-1 ring-surface-200 bg-white p-0.5" role="tablist" aria-label="Time range">
+          <div className="inline-flex rounded-lg ring-1 ring-surface-200 bg-white p-0.5 dark:bg-surface-900 dark:ring-surface-700" role="tablist" aria-label="Time range">
             {TIME_RANGES.map((r) => (
               <button
                 key={r.id}
@@ -302,7 +302,9 @@ export default function InsightsPage() {
                 aria-selected={range === r.id}
                 onClick={() => setRange(r.id)}
                 className={`text-xs px-2.5 py-1.5 rounded-md transition-colors ${
-                  range === r.id ? 'bg-brand-50 text-brand-700 font-semibold' : 'text-surface-600 hover:text-surface-900'
+                  range === r.id
+                    ? 'bg-brand-50 text-brand-700 font-semibold dark:bg-lime-500/15 dark:text-lime-300'
+                    : 'text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-100'
                 }`}
               >
                 {r.label}
@@ -311,7 +313,7 @@ export default function InsightsPage() {
             <button
               disabled
               title="Custom date range coming soon"
-              className="text-xs px-2.5 py-1.5 rounded-md text-surface-300 cursor-not-allowed"
+              className="text-xs px-2.5 py-1.5 rounded-md text-surface-300 dark:text-surface-600 cursor-not-allowed"
             >
               Custom
             </button>
@@ -335,7 +337,7 @@ export default function InsightsPage() {
 
       {/* Filters drawer (placeholder controls) */}
       {filtersOpen && (
-        <div className="card p-4 mb-6 bg-surface-50/60">
+        <div className="card p-4 mb-6 bg-surface-50/60 dark:bg-surface-900/40">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="label">Users</label>
@@ -352,15 +354,15 @@ export default function InsightsPage() {
               <button disabled className="btn-primary btn-sm opacity-60 cursor-not-allowed">Apply</button>
             </div>
           </div>
-          <p className="text-xs text-surface-400 mt-3 flex items-center gap-1">
+          <p className="text-xs text-surface-400 dark:text-surface-500 mt-3 flex items-center gap-1">
             <AlertTriangle size={12} /> Filters are coming soon — widgets currently reflect the full project scope.
           </p>
         </div>
       )}
 
       {error && (
-        <div role="alert" className="mb-6 card p-4 bg-red-50/80 border border-red-200">
-          <p className="text-sm text-red-700">{error}</p>
+        <div role="alert" className="mb-6 card p-4 bg-red-50/80 border border-red-200 dark:bg-red-500/10 dark:border-red-400/30">
+          <p className="text-sm text-red-700 dark:text-red-200">{error}</p>
         </div>
       )}
 
@@ -409,15 +411,15 @@ export default function InsightsPage() {
         {/* Active runs */}
         <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-surface-800 flex items-center gap-2">
-              <Play size={16} className="text-emerald-600" /> Active runs
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+              <Play size={16} className="text-emerald-600 dark:text-emerald-400" /> Active runs
             </h3>
-            <Link to={`/projects/${projectId}/test-runs?state=in_progress`} className="text-xs text-brand-600 hover:text-brand-700 font-medium">View →</Link>
+            <Link to={`/projects/${projectId}/test-runs?state=in_progress`} className="text-xs text-brand-600 hover:text-brand-700 dark:text-lime-400 dark:hover:text-lime-300 font-medium">View →</Link>
           </div>
           {loading ? <div className="skeleton h-10 w-20" /> : (
             <>
-              <p className="text-3xl font-semibold text-surface-900">{data?.runs.active ?? 0}</p>
-              <p className="text-xs text-surface-500 mt-1">new + in progress</p>
+              <p className="text-3xl font-semibold text-surface-900 dark:text-surface-50 tabular-nums">{data?.runs.active ?? 0}</p>
+              <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">new + in progress</p>
             </>
           )}
         </div>
@@ -425,15 +427,15 @@ export default function InsightsPage() {
         {/* Closed runs */}
         <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-surface-800 flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-brand-600" /> Closed runs
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-brand-600 dark:text-lime-400" /> Closed runs
             </h3>
-            <Link to={`/projects/${projectId}/test-runs?state=closed`} className="text-xs text-brand-600 hover:text-brand-700 font-medium">View →</Link>
+            <Link to={`/projects/${projectId}/test-runs?state=closed`} className="text-xs text-brand-600 hover:text-brand-700 dark:text-lime-400 dark:hover:text-lime-300 font-medium">View →</Link>
           </div>
           {loading ? <div className="skeleton h-10 w-20" /> : (
             <>
-              <p className="text-3xl font-semibold text-surface-900">{data?.runs.closed ?? 0}</p>
-              <p className="text-xs text-surface-500 mt-1">completed + closed</p>
+              <p className="text-3xl font-semibold text-surface-900 dark:text-surface-50 tabular-nums">{data?.runs.closed ?? 0}</p>
+              <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">completed + closed</p>
             </>
           )}
         </div>
@@ -441,8 +443,8 @@ export default function InsightsPage() {
         {/* Defects */}
         <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-surface-800 flex items-center gap-2">
-              <Bug size={16} className="text-red-600" /> Defects logged
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+              <Bug size={16} className="text-red-600 dark:text-red-400" /> Defects logged
             </h3>
           </div>
           {loading ? <div className="skeleton h-24 w-full" /> : (
@@ -453,7 +455,7 @@ export default function InsightsPage() {
         {/* Results from closed runs */}
         <div className="card p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-surface-800">Results from closed runs</h3>
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Results from closed runs</h3>
           </div>
           {loading ? <div className="skeleton h-24 w-full" /> : (
             <ResultsBar results={data?.results || {}} />
@@ -463,7 +465,7 @@ export default function InsightsPage() {
         {/* Type distribution */}
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-surface-800">Type of test cases</h3>
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Type of test cases</h3>
           </div>
           {loading ? <div className="skeleton h-24 w-full" /> : (
             <TypeDistribution dist={data?.typeDistribution || {}} />
@@ -473,7 +475,7 @@ export default function InsightsPage() {
         {/* Trend */}
         <div className="card p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-surface-800">Trend of test cases</h3>
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Trend of test cases</h3>
           </div>
           {loading ? <div className="skeleton h-32 w-full" /> : (
             <TrendChart points={data?.trend || []} />
@@ -483,7 +485,7 @@ export default function InsightsPage() {
         {/* Statistics summary */}
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-surface-800">Statistics</h3>
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Statistics</h3>
           </div>
           {loading ? <div className="skeleton h-24 w-full" /> : (
             <StatisticsCards insights={data || { summary: {}, runs: {}, defects: {} }} />
@@ -492,7 +494,7 @@ export default function InsightsPage() {
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center py-6 text-surface-400 text-sm">
+        <div className="flex items-center justify-center py-6 text-surface-400 dark:text-surface-500 text-sm">
           <Loader2 className="animate-spin mr-2" size={14} /> Loading insights…
         </div>
       )}
