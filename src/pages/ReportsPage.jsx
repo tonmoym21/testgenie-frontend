@@ -6,7 +6,7 @@ export default function ReportsPage() {
   const { projectId } = useParams();
   return (
     <div className="page">
-      {projectId && <BackButton to="/projects" label="Back" />}
+      {projectId && <BackButton to={`/projects/${projectId}`} label="Back to project" />}
       <div className="page-header">
         <div>
           <h1 className="page-title">Reports</h1>

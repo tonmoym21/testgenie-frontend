@@ -219,8 +219,8 @@ export default function DashboardPage() {
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
             Refresh
           </button>
-          <Link to="/run-test" className="btn-primary btn-sm">
-            <Sparkles size={14} /> New run
+          <Link to="/projects" className="btn-primary btn-sm">
+            <Sparkles size={14} /> New test
           </Link>
         </div>
       </div>

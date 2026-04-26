@@ -346,9 +346,18 @@ export default function Layout({ children }) {
             <span className="absolute right-2 top-1/2 -translate-y-1/2 hidden md:inline-flex text-xs text-surface-400 font-mono">⌘K</span>
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/run-test" className="btn-primary btn-sm">
-              <Sparkles size={14} /> New Test
-            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                const m = pathname.match(/^\/projects\/([^/]+)/);
+                if (m) navigate(`/projects/${m[1]}/test-cases?new=1`);
+                else if (storedProjectId) navigate(`/projects/${storedProjectId}/test-cases?new=1`);
+                else navigate('/projects');
+              }}
+              className="btn-primary btn-sm"
+            >
+              <Sparkles size={14} /> New test
+            </button>
             <button
               type="button"
               onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}

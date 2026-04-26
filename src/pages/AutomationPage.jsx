@@ -118,7 +118,7 @@ export default function AutomationPage() {
 
   return (
     <div className="page">
-      {urlProjectId && <BackButton to="/projects" label="Back to projects" />}
+      {urlProjectId && <BackButton to={`/projects/${urlProjectId}`} label="Back to project" />}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold">Automation Library</h1>

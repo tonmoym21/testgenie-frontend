@@ -113,6 +113,16 @@ export default function ProjectTestCasesPage() {
   // Create / Edit TC modal (unified)
   const [showCreate, setShowCreate] = useState(false);
   const [editingCase, setEditingCase] = useState(null);
+
+  // Auto-open create modal when arriving via "New test" CTA (?new=1).
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowCreate(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   // Team members for assignee rendering
   const [members, setMembers] = useState([]);
   // Copy/Move target-project picker
@@ -483,8 +493,8 @@ export default function ProjectTestCasesPage() {
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* Page header */}
       <div className="px-6 pt-5 pb-3 border-b border-surface-200/70 bg-white/80">
-        <Link to="/projects" className="inline-flex items-center gap-1.5 text-xs text-surface-500 hover:text-surface-800 mb-2 transition-colors">
-          <ArrowLeft size={12} /> Back to projects
+        <Link to={`/projects/${projectId}`} className="inline-flex items-center gap-1.5 text-xs text-surface-500 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-100 mb-2 transition-colors">
+          <ArrowLeft size={12} /> Back to project
         </Link>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
