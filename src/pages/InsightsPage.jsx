@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Activity, AlertTriangle, Bug, CheckCircle2, ChevronDown, Filter,
-  Gauge, LayoutGrid, Loader2, Pencil, Play, Plus, RefreshCw, Users,
+  Activity, AlertTriangle, Bug, CheckCircle2,
+  Gauge, Loader2, Play, RefreshCw, Users,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { setCurrentProjectId } from '../utils/currentProject';
@@ -210,33 +210,6 @@ function DefectsPanel({ defects, projectId }) {
   );
 }
 
-function ViewsDropdown({ open, onToggle }) {
-  return (
-    <div className="relative">
-      <button onClick={onToggle} className="btn-secondary btn-sm" aria-haspopup="menu" aria-expanded={open}>
-        <LayoutGrid size={14} /> Default view <ChevronDown size={14} />
-      </button>
-      {open && (
-        <div role="menu" className="absolute right-0 mt-2 w-56 card p-1 shadow-soft-lg z-30">
-          <button className="w-full text-left text-sm px-3 py-2 rounded-md bg-brand-50 text-brand-700 font-medium dark:bg-lime-500/10 dark:text-lime-300">
-            Default view
-          </button>
-          <button disabled className="w-full text-left text-sm px-3 py-2 rounded-md text-surface-400 dark:text-surface-500 cursor-not-allowed flex items-center gap-2">
-            <Plus size={14} /> Create view
-            <span className="ml-auto text-[10px] uppercase tracking-wide">Soon</span>
-          </button>
-          <button disabled className="w-full text-left text-sm px-3 py-2 rounded-md text-surface-400 dark:text-surface-500 cursor-not-allowed">
-            Duplicate
-          </button>
-          <button disabled className="w-full text-left text-sm px-3 py-2 rounded-md text-surface-400 dark:text-surface-500 cursor-not-allowed">
-            Delete
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function InsightsPage() {
   const { projectId } = useParams();
   const [project, setProject] = useState(null);
@@ -245,8 +218,6 @@ export default function InsightsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [viewsOpen, setViewsOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     if (projectId) setCurrentProjectId(projectId);
@@ -310,55 +281,12 @@ export default function InsightsPage() {
                 {r.label}
               </button>
             ))}
-            <button
-              disabled
-              title="Custom date range coming soon"
-              className="text-xs px-2.5 py-1.5 rounded-md text-surface-300 dark:text-surface-600 cursor-not-allowed"
-            >
-              Custom
-            </button>
           </div>
-          <ViewsDropdown open={viewsOpen} onToggle={() => setViewsOpen((v) => !v)} />
-          <button
-            onClick={() => setFiltersOpen((f) => !f)}
-            className="btn-secondary btn-sm"
-            aria-expanded={filtersOpen}
-          >
-            <Filter size={14} /> Filters
-          </button>
-          <button disabled title="Layout editing coming soon" className="btn-secondary btn-sm opacity-50 cursor-not-allowed">
-            <Pencil size={14} /> Edit layout
-          </button>
           <button onClick={() => load(true)} disabled={refreshing || loading} className="btn-secondary btn-sm">
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Refresh
           </button>
         </div>
       </div>
-
-      {/* Filters drawer (placeholder controls) */}
-      {filtersOpen && (
-        <div className="card p-4 mb-6 bg-surface-50/60 dark:bg-surface-900/40">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="label">Users</label>
-              <select disabled className="input opacity-60 cursor-not-allowed">
-                <option>All users</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">Unique test run name</label>
-              <input disabled placeholder="All runs" className="input opacity-60 cursor-not-allowed" />
-            </div>
-            <div className="flex items-end justify-end gap-2">
-              <button disabled className="btn-secondary btn-sm opacity-60 cursor-not-allowed">Clear</button>
-              <button disabled className="btn-primary btn-sm opacity-60 cursor-not-allowed">Apply</button>
-            </div>
-          </div>
-          <p className="text-xs text-surface-400 dark:text-surface-500 mt-3 flex items-center gap-1">
-            <AlertTriangle size={12} /> Filters are coming soon — widgets currently reflect the full project scope.
-          </p>
-        </div>
-      )}
 
       {error && (
         <div role="alert" className="mb-6 card p-4 bg-red-50/80 border border-red-200 dark:bg-red-500/10 dark:border-red-400/30">
