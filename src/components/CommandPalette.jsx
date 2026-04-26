@@ -237,13 +237,6 @@ export default function CommandPalette() {
 
   return (
     <>
-      {/* Keyboard hint in header */}
-      <div className="hidden md:inline-flex items-center gap-1 text-xs text-surface-500">
-        <kbd className="px-2 py-1 rounded border border-surface-200 bg-surface-50 font-mono">
-          ⌘K
-        </kbd>
-      </div>
-
       {/* Overlay */}
       {isOpen && (
         <div
@@ -258,18 +251,18 @@ export default function CommandPalette() {
         <div className="fixed left-1/2 top-1/4 z-50 w-full max-w-2xl -translate-x-1/2 animate-fade-in rounded-lg border border-surface-200 bg-white shadow-soft-lg dark:border-surface-800 dark:bg-surface-900">
           {/* Search input */}
           <div className="flex items-center gap-3 border-b border-surface-200 px-4 py-3 dark:border-surface-800">
-            <Search size={18} className="text-surface-400" />
+            <Search size={18} className="text-surface-400 dark:text-surface-500" />
             <input
               ref={inputRef}
               type="text"
-              placeholder="Search pages, actions..."
+              placeholder="Search pages, actions…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 bg-transparent text-base outline-none placeholder:text-surface-400"
+              className="flex-1 bg-transparent text-base outline-none text-surface-900 placeholder:text-surface-400 dark:text-surface-100 dark:placeholder:text-surface-500"
             />
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1 text-surface-400 hover:text-surface-600"
+              className="p-1 text-surface-400 hover:text-surface-600 dark:text-surface-500 dark:hover:text-surface-200"
               aria-label="Close command palette"
             >
               <X size={18} />
@@ -280,18 +273,20 @@ export default function CommandPalette() {
           <div className="max-h-96 overflow-y-auto p-2">
             {searchQuery && flatCommands.length === 0 ? (
               <div className="py-12 text-center">
-                <p className="text-sm text-surface-500">No results found</p>
+                <p className="text-sm text-surface-500 dark:text-surface-400">No results</p>
+              </div>
+            ) : !searchQuery ? (
+              <div className="py-12 text-center">
+                <p className="text-sm text-surface-500 dark:text-surface-400">Type to search pages and actions</p>
               </div>
             ) : (
               Object.entries(groupedCommands).map(([category, commands]) => (
                 <div key={category} className="mb-2">
-                  {/* Category header */}
-                  <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-surface-400">
+                  <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-surface-400 dark:text-surface-500">
                     {category}
                   </div>
 
-                  {/* Commands in category */}
-                  {commands.map((cmd, idx) => {
+                  {commands.map((cmd) => {
                     const globalIdx = flatCommands.findIndex((c) => c.id === cmd.id);
                     const isSelected = globalIdx === selectedIndex;
                     const Icon = cmd.icon;
@@ -302,7 +297,7 @@ export default function CommandPalette() {
                         onClick={() => handleSelectCommand(cmd)}
                         className={`w-full rounded px-2 py-2 text-left transition-colors ${
                           isSelected
-                            ? 'bg-brand-50 dark:bg-brand-500/20'
+                            ? 'bg-brand-50 dark:bg-lime-500/15'
                             : 'hover:bg-surface-50 dark:hover:bg-surface-800'
                         }`}
                         onMouseEnter={() => setSelectedIndex(globalIdx)}
@@ -312,21 +307,21 @@ export default function CommandPalette() {
                             size={16}
                             className={`mt-0.5 flex-shrink-0 ${
                               isSelected
-                                ? 'text-brand-600'
-                                : 'text-surface-400'
+                                ? 'text-brand-600 dark:text-lime-400'
+                                : 'text-surface-400 dark:text-surface-500'
                             }`}
                           />
                           <div className="flex-1 min-w-0">
                             <div
                               className={`text-sm font-medium ${
                                 isSelected
-                                  ? 'text-brand-700 dark:text-brand-300'
+                                  ? 'text-brand-700 dark:text-lime-300'
                                   : 'text-surface-900 dark:text-surface-100'
                               }`}
                             >
                               {cmd.label}
                             </div>
-                            <div className="text-xs text-surface-500">
+                            <div className="text-xs text-surface-500 dark:text-surface-400">
                               {cmd.description}
                             </div>
                           </div>
@@ -340,18 +335,16 @@ export default function CommandPalette() {
           </div>
 
           {/* Footer hints */}
-          <div className="border-t border-surface-200 bg-surface-50 px-4 py-2 text-xs text-surface-500 dark:border-surface-800 dark:bg-surface-800/50">
-            <div className="flex items-center justify-between">
-              <div className="flex gap-4">
-                <div className="flex items-center gap-1">
-                  <kbd>↑↓</kbd> to navigate
-                </div>
-                <div className="flex items-center gap-1">
-                  <kbd>⏎</kbd> to select
-                </div>
-                <div className="flex items-center gap-1">
-                  <kbd>Esc</kbd> to close
-                </div>
+          <div className="border-t border-surface-200 bg-surface-50 px-4 py-2 text-xs text-surface-500 dark:border-surface-800 dark:bg-surface-800/50 dark:text-surface-400">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5">
+                <kbd className="kbd">↑↓</kbd> navigate
+              </div>
+              <div className="flex items-center gap-1.5">
+                <kbd className="kbd">⏎</kbd> select
+              </div>
+              <div className="flex items-center gap-1.5">
+                <kbd className="kbd">Esc</kbd> close
               </div>
             </div>
           </div>
