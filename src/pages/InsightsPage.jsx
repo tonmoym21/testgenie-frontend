@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Activity, Bug, CheckCircle2, Filter, GripVertical,
+  Activity, Bug, CheckCircle2, Filter,
   Gauge, Loader2, Pencil, Play, RefreshCw, Save, Users, X,
 } from 'lucide-react';
 import { api } from '../services/api';
@@ -11,7 +11,7 @@ import { viewsApi } from '../services/viewsApi';
 import BackButton from '../components/BackButton';
 import ViewsDropdown from '../components/insights/ViewsDropdown';
 import FiltersDrawer from '../components/insights/FiltersDrawer';
-import { useReorderable } from '../components/insights/useReorderable';
+import LayoutEditor from '../components/insights/LayoutEditor';
 
 const TIME_RANGES = [
   { id: '1d',  label: '1D' },
@@ -27,10 +27,32 @@ const PRIORITY_TONES = {
   low: 'bg-surface-400',
 };
 
-const DEFAULT_LAYOUT = [
-  'active-runs', 'closed-runs', 'defects',
-  'results', 'type-distribution', 'trend', 'statistics',
+// Predefined modules supported by the layout editor.
+//   id    — stable across versions; persisted in view.layout
+//   label — human-readable name shown in the editor
+//   span  — number of grid columns it takes (1 or 2 in the lg:3 grid)
+const MODULES = [
+  { id: 'active-runs',       label: 'Active runs',          span: 1 },
+  { id: 'closed-runs',       label: 'Closed runs',          span: 1 },
+  { id: 'defects',           label: 'Defects logged',       span: 1 },
+  { id: 'results',           label: 'Results from runs',    span: 2 },
+  { id: 'type-distribution', label: 'Type of test cases',   span: 1 },
+  { id: 'trend',             label: 'Trend of test cases',  span: 2 },
+  { id: 'statistics',        label: 'Statistics',           span: 1 },
 ];
+const ALL_MODULE_IDS = MODULES.map((m) => m.id);
+
+// Map a `range` tab id to a backend-acceptable {startDate,endDate} pair, so
+// the backend never has to know about UI-side "1D / 7D / 30D" presets.
+function rangeToDates(range) {
+  if (range === 'all') return { startDate: '', endDate: '' };
+  const days = range === '1d' ? 1 : range === '7d' ? 7 : 30;
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - days);
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  return { startDate: fmt(start), endDate: fmt(end) };
+}
 
 function SummaryCard({ label, value, sublabel, icon: Icon, tone = 'brand' }) {
   const tones = {
@@ -214,32 +236,10 @@ function DefectsPanel({ defects, projectId }) {
   );
 }
 
-// One draggable shell wrapping each detail widget so layout-edit mode can
-// reorder them. The shell adds the grip handle, drop highlight, and grid-span.
-function WidgetShell({ id, span, editing, bindReorder, dragging, over, children }) {
-  const dragProps = editing ? bindReorder(id) : {};
-  return (
-    <div
-      {...dragProps}
-      className={`relative ${span === 2 ? 'lg:col-span-2' : ''}
-        ${editing ? 'ring-1 ring-dashed ring-surface-300 dark:ring-surface-600 rounded-xl' : ''}
-        ${editing && dragging === id ? 'opacity-40' : ''}
-        ${editing && over === id && dragging && dragging !== id ? 'ring-2 ring-brand-500 dark:ring-lime-400' : ''}
-      `}
-    >
-      {editing && (
-        <div className="absolute top-2 right-2 z-10 px-1.5 py-1 rounded-md bg-surface-900/80 text-white text-[10px] uppercase tracking-wide flex items-center gap-1 cursor-grab active:cursor-grabbing">
-          <GripVertical size={11} /> Drag
-        </div>
-      )}
-      {children}
-    </div>
-  );
-}
-
 export default function InsightsPage() {
   const { projectId } = useParams();
-  const { canManageTeam: isAdmin } = useAuth();
+  const { user, canManageTeam: isAdmin } = useAuth();
+  const userId = user?.userId || null;
 
   const [project, setProject] = useState(null);
   const [insights, setInsights] = useState(null);
@@ -247,52 +247,55 @@ export default function InsightsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  // View + filter state.
+  // Views + applied state
   const [views, setViews] = useState([]);
   const [activeViewId, setActiveViewId] = useState(null);
+  const [bootstrapped, setBootstrapped] = useState(false);
+
   const [range, setRange] = useState('30d');
   const [filters, setFilters] = useState(viewsApi.defaultFilters());
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sort, setSort] = useState(viewsApi.defaultSort());
+  const [layout, setLayout] = useState(viewsApi.defaultLayout(ALL_MODULE_IDS));
 
-  // Layout-edit state. `layout` is the per-user order of detail widgets.
-  const [layout, setLayout] = useState(DEFAULT_LAYOUT);
+  // UI panels
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [layoutEditing, setLayoutEditing] = useState(false);
-  const [layoutDirty, setLayoutDirty] = useState(false);
   const [savedHint, setSavedHint] = useState('');
 
-  // Bootstrap views + layout on project change.
+  // Bootstrap views on project change. Picks: active session view, else
+  // user default, else org default, else raw default.
   useEffect(() => {
     if (!projectId) return;
     setCurrentProjectId(projectId);
 
     let cancelled = false;
+    setBootstrapped(false);
     (async () => {
       const list = await viewsApi.list(projectId).catch(() => []);
       if (cancelled) return;
       setViews(list);
 
       const activeId = viewsApi.getActiveViewId(projectId);
-      if (activeId) {
-        const v = list.find((x) => x.id === activeId);
-        if (v) applyView(v);
-      }
+      let toApply = list.find((v) => v.id === activeId);
+      if (!toApply) toApply = await viewsApi.getDefaultView(projectId, userId);
 
-      const userLayout = viewsApi.getUserLayout(projectId)
-        || viewsApi.getOrgDefaultLayout(projectId);
-      if (userLayout && Array.isArray(userLayout) && userLayout.length === DEFAULT_LAYOUT.length) {
-        setLayout(userLayout);
-      } else {
-        setLayout(DEFAULT_LAYOUT);
-      }
+      if (toApply) applyView(toApply);
+      setBootstrapped(true);
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  }, [projectId, userId]);
 
   function applyView(v) {
     setActiveViewId(v.id);
-    if (v.config?.range) setRange(v.config.range);
-    if (v.config?.filters) setFilters({ ...viewsApi.defaultFilters(), ...v.config.filters });
+    if (v.filters) setFilters({ ...viewsApi.defaultFilters(), ...v.filters });
+    if (v.sort) setSort({ ...viewsApi.defaultSort(), ...v.sort });
+    if (v.layout) {
+      setLayout({
+        visibleModules: v.layout.visibleModules?.length ? v.layout.visibleModules : ALL_MODULE_IDS,
+        moduleOrder: v.layout.moduleOrder?.length ? v.layout.moduleOrder : ALL_MODULE_IDS,
+      });
+    }
   }
 
   const activeView = useMemo(
@@ -300,13 +303,32 @@ export default function InsightsPage() {
     [views, activeViewId],
   );
 
-  // Detect when current state has drifted from the active view.
+  // Detect drift between current state and active view config.
   const isDirty = useMemo(() => {
     if (!activeView) return false;
-    const cfg = activeView.config || {};
-    if ((cfg.range || '30d') !== range) return true;
-    return JSON.stringify(cfg.filters || {}) !== JSON.stringify(filters);
-  }, [activeView, range, filters]);
+    if (JSON.stringify(activeView.filters || {}) !== JSON.stringify(filters)) return true;
+    if (JSON.stringify(activeView.sort || {}) !== JSON.stringify(sort)) return true;
+    if (JSON.stringify(activeView.layout || {}) !== JSON.stringify(layout)) return true;
+    return false;
+  }, [activeView, filters, sort, layout]);
+
+  // Compose the query that would go to the backend if it were live. The
+  // current /insights endpoint only accepts `range` — we still pass it so
+  // existing data still loads. The full filter object is here so swapping
+  // to the contract endpoint later is one line.
+  const insightsQuery = useMemo(() => {
+    const base = filters.startDate || filters.endDate
+      ? { startDate: filters.startDate, endDate: filters.endDate }
+      : rangeToDates(range);
+    return {
+      ...base,
+      ownerIds: filters.ownerIds || [],
+      teamIds: filters.teamIds || [],
+      tags: filters.tags || [],
+      statuses: filters.statuses || [],
+      priorities: filters.priorities || [],
+    };
+  }, [range, filters]);
 
   const load = useMemo(() => async (showRefresh = false) => {
     if (!projectId) return;
@@ -316,6 +338,9 @@ export default function InsightsPage() {
     try {
       const [proj, ins] = await Promise.all([
         api.getProject(projectId).catch(() => null),
+        // STUB-LIMIT: backend currently only honors `range`. When the contract
+        // endpoint lands, replace this call with one that passes
+        // `insightsQuery` directly (start/end + the 5 filter dimension keys).
         api.getProjectInsights(projectId, { range }).catch((err) => {
           throw new Error(err?.message || 'Failed to load insights');
         }),
@@ -340,32 +365,30 @@ export default function InsightsPage() {
     viewsApi.setActiveViewId(projectId, id);
   };
 
-  const handleCreateView = async () => {
-    const name = prompt('Name this view:', activeView ? `${activeView.name} (variant)` : 'My view');
+  const handleCreate = async (scope = 'personal') => {
+    if (scope === 'org' && !isAdmin) return;
+    const name = prompt(`Name this ${scope === 'org' ? 'org' : 'personal'} view:`,
+      activeView ? `${activeView.name} (variant)` : 'My view');
     if (!name) return;
-    const v = await viewsApi.create(projectId, {
-      name,
-      scope: 'personal',
-      config: { range, filters, sort: 'recent', layout },
-    });
+    const v = await viewsApi.create(projectId, { name, scope, filters, layout, sort, isDefault: false });
     setViews((prev) => [...prev, v]);
     setActiveViewId(v.id);
     viewsApi.setActiveViewId(projectId, v.id);
   };
 
-  const handleRenameView = async (v) => {
+  const handleRename = async (v) => {
     const name = prompt('Rename view:', v.name);
     if (!name || name === v.name) return;
     const updated = await viewsApi.update(v.id, { name });
     setViews((prev) => prev.map((x) => (x.id === v.id ? updated : x)));
   };
 
-  const handleDuplicateView = async (v) => {
+  const handleDuplicate = async (v) => {
     const copy = await viewsApi.duplicate(v.id);
     setViews((prev) => [...prev, copy]);
   };
 
-  const handleDeleteView = async (v) => {
+  const handleDelete = async (v) => {
     if (!confirm(`Delete "${v.name}"?`)) return;
     await viewsApi.remove(v.id);
     setViews((prev) => prev.filter((x) => x.id !== v.id));
@@ -375,167 +398,165 @@ export default function InsightsPage() {
     }
   };
 
-  const handleShareToggle = async (v) => {
-    const nextScope = v.scope === 'org' ? 'personal' : 'org';
-    const updated = await viewsApi.update(v.id, { scope: nextScope });
+  const handleShareToOrg = async (v) => {
+    if (!isAdmin) return;
+    const updated = await viewsApi.update(v.id, { scope: 'org' });
     setViews((prev) => prev.map((x) => (x.id === v.id ? updated : x)));
+  };
+
+  const handleMakePersonal = async (v) => {
+    if (!isAdmin) return;
+    const updated = await viewsApi.update(v.id, { scope: 'personal', isDefault: false });
+    setViews((prev) => prev.map((x) => (x.id === v.id ? updated : x)));
+  };
+
+  const handleSetDefault = async (v) => {
+    const updated = await viewsApi.update(v.id, { isDefault: true });
+    // Server enforces one-default-per-scope; reload list to reflect that.
+    const list = await viewsApi.list(projectId);
+    setViews(list);
+    if (updated) setSavedHint(`Set "${updated.name}" as default`);
+    setTimeout(() => setSavedHint(''), 1800);
+  };
+
+  const handleClearDefault = async (v) => {
+    await viewsApi.update(v.id, { isDefault: false });
+    const list = await viewsApi.list(projectId);
+    setViews(list);
   };
 
   const handleSaveDirty = async () => {
     if (!activeView) return;
-    const updated = await viewsApi.update(activeView.id, {
-      config: { ...activeView.config, range, filters },
-    });
+    const updated = await viewsApi.update(activeView.id, { filters, layout, sort });
     setViews((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
     setSavedHint('View updated');
     setTimeout(() => setSavedHint(''), 1800);
   };
 
-  // ----- Filter handlers -----
+  // ----- Filter helpers -----
   const filterCount =
-    (filters.dateFrom ? 1 : 0) + (filters.dateTo ? 1 : 0) +
-    (filters.owners?.length || 0) + (filters.statuses?.length || 0) +
-    (filters.priorities?.length || 0) + (filters.teams?.length || 0) +
-    (filters.tags?.length || 0);
+    (filters.startDate ? 1 : 0) + (filters.endDate ? 1 : 0) +
+    (filters.ownerIds?.length || 0) + (filters.teamIds?.length || 0) +
+    (filters.tags?.length || 0) +
+    (filters.statuses?.length || 0) + (filters.priorities?.length || 0);
 
   const handleClearFilters = () => setFilters(viewsApi.defaultFilters());
 
-  // ----- Layout handlers -----
-  const { bind: bindReorder, dragging, over } = useReorderable({
-    order: layout,
-    enabled: layoutEditing,
-    onReorder: (next) => { setLayout(next); setLayoutDirty(true); },
-  });
-
-  const enterLayoutEdit = () => { setLayoutEditing(true); setLayoutDirty(false); };
-  const cancelLayoutEdit = () => {
-    const saved = viewsApi.getUserLayout(projectId)
-      || viewsApi.getOrgDefaultLayout(projectId)
-      || DEFAULT_LAYOUT;
-    setLayout(saved);
-    setLayoutEditing(false);
-    setLayoutDirty(false);
+  // ----- Layout helpers -----
+  const handleLayoutChange = ({ visibleModules, moduleOrder }) => {
+    setLayout({
+      visibleModules: visibleModules ?? layout.visibleModules,
+      moduleOrder: moduleOrder ?? layout.moduleOrder,
+    });
   };
-  const saveLayout = () => {
-    viewsApi.setUserLayout(projectId, layout);
-    setLayoutEditing(false);
-    setLayoutDirty(false);
-    setSavedHint('Layout saved');
-    setTimeout(() => setSavedHint(''), 1800);
-  };
-  const saveLayoutAsOrgDefault = () => {
-    viewsApi.setOrgDefaultLayout(projectId, layout);
-    viewsApi.setUserLayout(projectId, layout);
-    setLayoutEditing(false);
-    setLayoutDirty(false);
-    setSavedHint('Saved as org default');
-    setTimeout(() => setSavedHint(''), 1800);
-  };
+  const handleLayoutReset = () => setLayout(viewsApi.defaultLayout(ALL_MODULE_IDS));
 
   const data = insights;
 
-  // Render the detail widgets in current layout order. Each entry is a
-  // self-contained card so reordering is just shuffling the wrappers.
-  const detailWidgets = {
+  // Build the rendered widget list from layout: order then filter to visible.
+  const widgetMap = {
     'active-runs': (
-      <WidgetShell id="active-runs" editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
-              <Play size={16} className="text-emerald-600 dark:text-emerald-400" /> Active runs
-            </h3>
-            <Link to={`/projects/${projectId}/test-runs?state=in_progress`} className="text-xs text-brand-600 hover:text-brand-700 dark:text-lime-400 dark:hover:text-lime-300 font-medium">View →</Link>
-          </div>
-          {loading ? <div className="skeleton h-10 w-20" /> : (
-            <>
-              <p className="text-3xl font-semibold text-surface-900 dark:text-surface-50 tabular-nums">{data?.runs.active ?? 0}</p>
-              <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">new + in progress</p>
-            </>
-          )}
+      <div className="card p-5" key="active-runs">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+            <Play size={16} className="text-emerald-600 dark:text-emerald-400" /> Active runs
+          </h3>
+          <Link to={`/projects/${projectId}/test-runs?state=in_progress`} className="text-xs text-brand-600 hover:text-brand-700 dark:text-lime-400 dark:hover:text-lime-300 font-medium">View →</Link>
         </div>
-      </WidgetShell>
+        {loading ? <div className="skeleton h-10 w-20" /> : (
+          <>
+            <p className="text-3xl font-semibold text-surface-900 dark:text-surface-50 tabular-nums">{data?.runs.active ?? 0}</p>
+            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">new + in progress</p>
+          </>
+        )}
+      </div>
     ),
     'closed-runs': (
-      <WidgetShell id="closed-runs" editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-brand-600 dark:text-lime-400" /> Closed runs
-            </h3>
-            <Link to={`/projects/${projectId}/test-runs?state=closed`} className="text-xs text-brand-600 hover:text-brand-700 dark:text-lime-400 dark:hover:text-lime-300 font-medium">View →</Link>
-          </div>
-          {loading ? <div className="skeleton h-10 w-20" /> : (
-            <>
-              <p className="text-3xl font-semibold text-surface-900 dark:text-surface-50 tabular-nums">{data?.runs.closed ?? 0}</p>
-              <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">completed + closed</p>
-            </>
-          )}
+      <div className="card p-5" key="closed-runs">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-brand-600 dark:text-lime-400" /> Closed runs
+          </h3>
+          <Link to={`/projects/${projectId}/test-runs?state=closed`} className="text-xs text-brand-600 hover:text-brand-700 dark:text-lime-400 dark:hover:text-lime-300 font-medium">View →</Link>
         </div>
-      </WidgetShell>
+        {loading ? <div className="skeleton h-10 w-20" /> : (
+          <>
+            <p className="text-3xl font-semibold text-surface-900 dark:text-surface-50 tabular-nums">{data?.runs.closed ?? 0}</p>
+            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">completed + closed</p>
+          </>
+        )}
+      </div>
     ),
     'defects': (
-      <WidgetShell id="defects" editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
-              <Bug size={16} className="text-red-600 dark:text-red-400" /> Defects logged
-            </h3>
-          </div>
-          {loading ? <div className="skeleton h-24 w-full" /> : (
-            <DefectsPanel defects={data?.defects || { total: 0, open: 0, resolved: 0 }} projectId={projectId} />
-          )}
+      <div className="card p-5" key="defects">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+            <Bug size={16} className="text-red-600 dark:text-red-400" /> Defects logged
+          </h3>
         </div>
-      </WidgetShell>
+        {loading ? <div className="skeleton h-24 w-full" /> : (
+          <DefectsPanel defects={data?.defects || { total: 0, open: 0, resolved: 0 }} projectId={projectId} />
+        )}
+      </div>
     ),
     'results': (
-      <WidgetShell id="results" span={2} editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Results from closed runs</h3>
-          </div>
-          {loading ? <div className="skeleton h-24 w-full" /> : (
-            <ResultsBar results={data?.results || {}} />
-          )}
+      <div className="card p-5 lg:col-span-2" key="results">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-surface-800 dark:text-surface-100">Results from closed runs</h3>
         </div>
-      </WidgetShell>
+        {loading ? <div className="skeleton h-24 w-full" /> : (
+          <ResultsBar results={data?.results || {}} />
+        )}
+      </div>
     ),
     'type-distribution': (
-      <WidgetShell id="type-distribution" editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Type of test cases</h3>
-          </div>
-          {loading ? <div className="skeleton h-24 w-full" /> : (
-            <TypeDistribution dist={data?.typeDistribution || {}} />
-          )}
+      <div className="card p-5" key="type-distribution">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-surface-800 dark:text-surface-100">Type of test cases</h3>
         </div>
-      </WidgetShell>
+        {loading ? <div className="skeleton h-24 w-full" /> : (
+          <TypeDistribution dist={data?.typeDistribution || {}} />
+        )}
+      </div>
     ),
     'trend': (
-      <WidgetShell id="trend" span={2} editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Trend of test cases</h3>
-          </div>
-          {loading ? <div className="skeleton h-32 w-full" /> : (
-            <TrendChart points={data?.trend || []} />
-          )}
+      <div className="card p-5 lg:col-span-2" key="trend">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-surface-800 dark:text-surface-100">Trend of test cases</h3>
         </div>
-      </WidgetShell>
+        {loading ? <div className="skeleton h-32 w-full" /> : (
+          <TrendChart points={data?.trend || []} />
+        )}
+      </div>
     ),
     'statistics': (
-      <WidgetShell id="statistics" editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Statistics</h3>
-          </div>
-          {loading ? <div className="skeleton h-24 w-full" /> : (
-            <StatisticsCards insights={data || { summary: {}, runs: {}, defects: {} }} />
-          )}
+      <div className="card p-5" key="statistics">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-surface-800 dark:text-surface-100">Statistics</h3>
         </div>
-      </WidgetShell>
+        {loading ? <div className="skeleton h-24 w-full" /> : (
+          <StatisticsCards insights={data || { summary: {}, runs: {}, defects: {} }} />
+        )}
+      </div>
     ),
   };
+
+  const renderedWidgets = layout.moduleOrder
+    .filter((id) => layout.visibleModules.includes(id) && widgetMap[id])
+    .map((id) => widgetMap[id]);
+
+  // Only render the page once views/defaults are bootstrapped, otherwise
+  // a flash-of-default could overwrite the saved active view.
+  if (!bootstrapped) {
+    return (
+      <div className="page">
+        <BackButton to="/projects" label="Back to projects" />
+        <div className="flex items-center justify-center py-16 text-surface-400 dark:text-surface-500 text-sm">
+          <Loader2 className="animate-spin mr-2" size={14} /> Preparing your view…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -575,16 +596,20 @@ export default function InsightsPage() {
           <ViewsDropdown
             views={views}
             activeView={activeView}
+            userId={userId}
             isAdmin={isAdmin}
             onSelect={handleSelectView}
-            onCreate={handleCreateView}
-            onRename={handleRenameView}
-            onDuplicate={handleDuplicateView}
-            onDelete={handleDeleteView}
-            onShareToggle={handleShareToggle}
+            onCreate={handleCreate}
+            onRename={handleRename}
+            onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
+            onShareToOrg={handleShareToOrg}
+            onMakePersonal={handleMakePersonal}
+            onSetDefault={handleSetDefault}
+            onClearDefault={handleClearDefault}
           />
 
-          {isDirty && (
+          {isDirty && activeView && (
             <button onClick={handleSaveDirty} className="btn-secondary btn-sm" title="Save changes to active view">
               <Save size={14} /> Save view
             </button>
@@ -605,23 +630,13 @@ export default function InsightsPage() {
           </button>
 
           {!layoutEditing ? (
-            <button onClick={enterLayoutEdit} className="btn-secondary btn-sm" title="Drag-reorder widgets">
+            <button onClick={() => setLayoutEditing(true)} className="btn-secondary btn-sm" title="Show/hide and reorder modules">
               <Pencil size={14} /> Edit layout
             </button>
           ) : (
-            <>
-              <button onClick={saveLayout} disabled={!layoutDirty} className="btn-primary btn-sm">
-                <Save size={14} /> Save layout
-              </button>
-              {isAdmin && (
-                <button onClick={saveLayoutAsOrgDefault} disabled={!layoutDirty} className="btn-secondary btn-sm" title="Make this the default layout for everyone in the org">
-                  <Users size={14} /> Save as org default
-                </button>
-              )}
-              <button onClick={cancelLayoutEdit} className="btn-ghost btn-sm">
-                <X size={14} /> Cancel
-              </button>
-            </>
+            <button onClick={() => setLayoutEditing(false)} className="btn-secondary btn-sm">
+              <X size={14} /> Done editing
+            </button>
           )}
 
           <button onClick={() => load(true)} disabled={refreshing || loading} className="btn-secondary btn-sm">
@@ -640,10 +655,21 @@ export default function InsightsPage() {
         <FiltersDrawer
           open={filtersOpen}
           filters={filters}
+          projectId={projectId}
           projectName={project?.name}
           onChange={setFilters}
           onClear={handleClearFilters}
           onClose={() => setFiltersOpen(false)}
+        />
+      )}
+
+      {layoutEditing && (
+        <LayoutEditor
+          modules={MODULES}
+          visible={layout.visibleModules}
+          order={layout.moduleOrder}
+          onChange={handleLayoutChange}
+          onReset={handleLayoutReset}
         />
       )}
 
@@ -653,7 +679,7 @@ export default function InsightsPage() {
         </div>
       )}
 
-      {/* Summary cards (fixed; not part of drag-reorder per spec — drag-reorder only) */}
+      {/* Summary cards (always visible — not part of the show/hide layout) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {loading ? (
           <>
@@ -693,10 +719,16 @@ export default function InsightsPage() {
         )}
       </div>
 
-      {/* Reorderable detail widgets */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {layout.map((id) => detailWidgets[id]).filter(Boolean)}
-      </div>
+      {/* Detail widgets driven by layout.visibleModules + moduleOrder */}
+      {renderedWidgets.length > 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          {renderedWidgets}
+        </div>
+      ) : (
+        <div className="card p-6 mb-6 text-center text-sm text-surface-500 dark:text-surface-400">
+          All modules are hidden. Open <button onClick={() => setLayoutEditing(true)} className="underline">Edit layout</button> to bring them back.
+        </div>
+      )}
 
       {loading && (
         <div className="flex items-center justify-center py-6 text-surface-400 dark:text-surface-500 text-sm">

@@ -1,40 +1,23 @@
-import { X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, Loader2 } from 'lucide-react';
+import { metadataApi } from '../../services/metadataApi';
 
-const STATUSES = [
-  { id: 'passed',   label: 'Passed' },
-  { id: 'failed',   label: 'Failed' },
-  { id: 'blocked',  label: 'Blocked' },
-  { id: 'skipped',  label: 'Skipped' },
-  { id: 'retest',   label: 'Retest' },
-  { id: 'untested', label: 'Untested' },
-];
-
-const PRIORITIES = [
-  { id: 'critical', label: 'Critical' },
-  { id: 'high',     label: 'High' },
-  { id: 'medium',   label: 'Medium' },
-  { id: 'low',      label: 'Low' },
-];
-
-// In a real backend wiring, owners/teams/tags would come from the project's
-// own metadata. Stub with sensible placeholders so the drawer renders.
-const STUB_OWNERS = ['unassigned', 'me', 'team-lead'];
-const STUB_TEAMS = ['frontend', 'backend', 'qa', 'platform'];
-const STUB_TAGS = ['regression', 'smoke', 'auth', 'checkout', 'flaky'];
-
-function ChipGroup({ value = [], options, onToggle }) {
+function ChipGroup({ value = [], options, onToggle, capitalize = false }) {
+  if (!options || options.length === 0) {
+    return <p className="text-xs text-surface-400 dark:text-surface-500">None available</p>;
+  }
   return (
     <div className="flex flex-wrap gap-1.5">
       {options.map((opt) => {
         const id = typeof opt === 'string' ? opt : opt.id;
-        const label = typeof opt === 'string' ? opt : opt.label;
+        const label = typeof opt === 'string' ? opt : opt.name;
         const active = value.includes(id);
         return (
           <button
             key={id}
             type="button"
             onClick={() => onToggle(id)}
-            className={`text-xs px-2.5 py-1 rounded-full border transition-colors capitalize
+            className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${capitalize ? 'capitalize' : ''}
               ${active
                 ? 'bg-brand-50 text-brand-700 border-brand-300 dark:bg-lime-500/15 dark:text-lime-200 dark:border-lime-400/40'
                 : 'bg-white text-surface-600 border-surface-200 hover:border-surface-300 dark:bg-surface-900 dark:text-surface-300 dark:border-surface-700 dark:hover:border-surface-600'}`}
@@ -56,14 +39,31 @@ function Field({ label, children }) {
   );
 }
 
+const EMPTY_META = { owners: [], teams: [], tags: [], statuses: [], priorities: [] };
+
 export default function FiltersDrawer({
   open,
   filters,
+  projectId,
   projectName,
   onChange,
   onClear,
   onClose,
 }) {
+  const [meta, setMeta] = useState(EMPTY_META);
+  const [metaLoading, setMetaLoading] = useState(true);
+
+  useEffect(() => {
+    if (!open || !projectId) return;
+    let cancelled = false;
+    setMetaLoading(true);
+    metadataApi.getMetadata(projectId)
+      .then((m) => { if (!cancelled) setMeta(m); })
+      .catch(() => { if (!cancelled) setMeta(EMPTY_META); })
+      .finally(() => { if (!cancelled) setMetaLoading(false); });
+    return () => { cancelled = true; };
+  }, [open, projectId]);
+
   if (!open) return null;
 
   const set = (patch) => onChange({ ...filters, ...patch });
@@ -73,17 +73,18 @@ export default function FiltersDrawer({
   };
 
   const isDirty =
-    filters.dateFrom || filters.dateTo ||
-    (filters.owners && filters.owners.length) ||
-    (filters.statuses && filters.statuses.length) ||
-    (filters.priorities && filters.priorities.length) ||
-    (filters.teams && filters.teams.length) ||
-    (filters.tags && filters.tags.length);
+    filters.startDate || filters.endDate ||
+    (filters.ownerIds?.length) || (filters.teamIds?.length) ||
+    (filters.tags?.length) || (filters.statuses?.length) ||
+    (filters.priorities?.length);
 
   return (
     <div className="card p-5 mb-6 bg-surface-50/60 dark:bg-surface-900/40">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-surface-800 dark:text-surface-100">Filters</h3>
+        <h3 className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+          Filters
+          {metaLoading && <Loader2 size={12} className="animate-spin text-surface-400" />}
+        </h3>
         <button
           onClick={onClose}
           className="icon-btn text-surface-500 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-100"
@@ -98,17 +99,17 @@ export default function FiltersDrawer({
           <div className="grid grid-cols-2 gap-2">
             <input
               type="date"
-              value={filters.dateFrom || ''}
-              onChange={(e) => set({ dateFrom: e.target.value })}
+              value={filters.startDate || ''}
+              onChange={(e) => set({ startDate: e.target.value })}
               className="input"
-              aria-label="From"
+              aria-label="Start date"
             />
             <input
               type="date"
-              value={filters.dateTo || ''}
-              onChange={(e) => set({ dateTo: e.target.value })}
+              value={filters.endDate || ''}
+              onChange={(e) => set({ endDate: e.target.value })}
               className="input"
-              aria-label="To"
+              aria-label="End date"
             />
           </div>
           <p className="text-[11px] text-surface-400 dark:text-surface-500 mt-1">Overrides the time-range tabs above.</p>
@@ -122,23 +123,23 @@ export default function FiltersDrawer({
         </Field>
 
         <Field label="Owner">
-          <ChipGroup value={filters.owners} options={STUB_OWNERS} onToggle={(id) => toggle('owners', id)} />
-        </Field>
-
-        <Field label="Status">
-          <ChipGroup value={filters.statuses} options={STATUSES} onToggle={(id) => toggle('statuses', id)} />
-        </Field>
-
-        <Field label="Priority">
-          <ChipGroup value={filters.priorities} options={PRIORITIES} onToggle={(id) => toggle('priorities', id)} />
+          <ChipGroup value={filters.ownerIds} options={meta.owners} onToggle={(id) => toggle('ownerIds', id)} />
         </Field>
 
         <Field label="Team">
-          <ChipGroup value={filters.teams} options={STUB_TEAMS} onToggle={(id) => toggle('teams', id)} />
+          <ChipGroup value={filters.teamIds} options={meta.teams} onToggle={(id) => toggle('teamIds', id)} />
         </Field>
 
         <Field label="Tag">
-          <ChipGroup value={filters.tags} options={STUB_TAGS} onToggle={(id) => toggle('tags', id)} />
+          <ChipGroup value={filters.tags} options={meta.tags} onToggle={(id) => toggle('tags', id)} />
+        </Field>
+
+        <Field label="Status">
+          <ChipGroup value={filters.statuses} options={meta.statuses} onToggle={(id) => toggle('statuses', id)} capitalize />
+        </Field>
+
+        <Field label="Priority">
+          <ChipGroup value={filters.priorities} options={meta.priorities} onToggle={(id) => toggle('priorities', id)} />
         </Field>
       </div>
 
