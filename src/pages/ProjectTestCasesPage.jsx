@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import CreateTestCaseModal from '../components/CreateTestCaseModal';
 import ImportTestCasesModal from '../components/ImportTestCasesModal';
+import OrganizeTestCaseModal from '../components/OrganizeTestCaseModal';
 import { setCurrentProjectId } from '../utils/currentProject';
 
 const PRIORITY_STYLES = {
@@ -113,6 +114,9 @@ export default function ProjectTestCasesPage() {
   // Create / Edit TC modal (unified)
   const [showCreate, setShowCreate] = useState(false);
   const [editingCase, setEditingCase] = useState(null);
+
+  // Re-organize a test case (Keep / move to existing folder / create new folder).
+  const [organizeTarget, setOrganizeTarget] = useState(null);
 
   // Auto-open create modal when arriving via "New test" CTA (?new=1).
   useEffect(() => {
@@ -746,6 +750,7 @@ export default function ProjectTestCasesPage() {
                       )}
                     </div>
                     <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => setOrganizeTarget(tc)} className="icon-btn" aria-label="Organize"><FolderOpen size={13} /></button>
                       <button onClick={() => openEdit(tc)} className="icon-btn" aria-label="Edit"><Pencil size={13} /></button>
                       <button onClick={() => handleDeleteTestCase(tc.id)} className="icon-btn hover:text-red-500" aria-label="Delete"><Trash2 size={13} /></button>
                     </div>
@@ -953,6 +958,22 @@ export default function ProjectTestCasesPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {organizeTarget && (
+        <OrganizeTestCaseModal
+          projectId={projectId}
+          testCase={organizeTarget}
+          onClose={() => setOrganizeTarget(null)}
+          onSaved={(updated) => {
+            setTestCases((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+            // If a new folder was created, refresh folders so it shows up in the tree.
+            if (updated.folderId && !folders.find((f) => f.id === updated.folderId)) {
+              api.getFolders(projectId).then((res) => setFolders(Array.isArray(res?.data) ? res.data : [])).catch(() => {});
+            }
+            setOrganizeTarget(null);
+          }}
+        />
       )}
     </div>
   );

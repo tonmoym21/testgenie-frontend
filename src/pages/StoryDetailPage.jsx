@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Plus, Loader2, Trash2, Check, X, Download, AlertTriangle, RotateCcw,
+  ArrowLeft, Plus, Loader2, Trash2, Check, X, Download, AlertTriangle, RotateCcw, FolderOpen,
 } from 'lucide-react';
 import {
   getStory, listScenarios, updateScenarioStatus, createScenario, getCoverage, exportStoryCsv,
   listManualTestCases, createManualTestCase, deleteManualTestCase,
 } from '../services/storyApi';
 import GeneratePlaywrightButton from '../components/GeneratePlaywrightButton';
+import OrganizeTestCaseModal from '../components/OrganizeTestCaseModal';
 
 const CATEGORY_LABELS = {
   happy_path: 'Happy Path', negative: 'Negative', edge: 'Edge Cases', validation: 'Validation',
@@ -56,6 +57,9 @@ export default function StoryDetailPage() {
   const [manualForm, setManualForm] = useState({ title: '', content: '', priority: 'medium' });
   const [manualSaving, setManualSaving] = useState(false);
   const [manualError, setManualError] = useState('');
+
+  // Post-approval organization modal — opened when a scenario approval returns a test case.
+  const [organizeTarget, setOrganizeTarget] = useState(null);
 
   // Manual AI scenario creation
   const [showAddModal, setShowAddModal] = useState(false);
@@ -114,9 +118,32 @@ export default function StoryDetailPage() {
   const handleStatusChange = async (scenarioId, newStatus) => {
     try {
       const updated = await updateScenarioStatus(projectId, storyId, scenarioId, newStatus);
-      setScenarios((prev) => prev.map((s) => (s.id === scenarioId ? updated : s)));
+      // The backend strips linkedTestCase off the scenario row before persisting, but the
+      // response payload carries it for UI use. Don't store it in scenarios state.
+      const { linkedTestCase, ...scenarioRow } = updated || {};
+      setScenarios((prev) => prev.map((s) => (s.id === scenarioId ? scenarioRow : s)));
       const cov = await getCoverage(projectId, storyId);
       setCoverage(cov);
+      // Approval just materialized (or refreshed the link to) a test_cases row — let the
+      // user decide where to file it. Skipping leaves it unfiled on the Test Cases page.
+      if (newStatus === 'approved' && linkedTestCase) {
+        setOrganizeTarget(linkedTestCase);
+      }
+    } catch (err) { alert('Failed: ' + err.message); }
+  };
+
+  // Re-open the Organize modal for an already-approved scenario. Re-PATCHing to 'approved'
+  // is idempotent on the backend: it no-ops the status update and ensures a linked test case
+  // exists (creating one for legacy approvals that never went through the conversion flow).
+  const handleOrganizeScenario = async (scenarioId) => {
+    try {
+      const updated = await updateScenarioStatus(projectId, storyId, scenarioId, 'approved');
+      const linkedTestCase = updated?.linkedTestCase;
+      if (linkedTestCase) {
+        setOrganizeTarget(linkedTestCase);
+      } else {
+        alert('No linked test case found for this scenario. If this scenario was approved on an older build, try Reset → Approve to convert it.');
+      }
     } catch (err) { alert('Failed: ' + err.message); }
   };
 
@@ -428,7 +455,7 @@ export default function StoryDetailPage() {
               </div>
               <div className="space-y-2">
                 {items.map((s) => (
-                  <ScenarioCard key={s.id} scenario={s} onStatusChange={handleStatusChange} />
+                  <ScenarioCard key={s.id} scenario={s} onStatusChange={handleStatusChange} onOrganize={handleOrganizeScenario} />
                 ))}
               </div>
             </div>
@@ -543,6 +570,15 @@ export default function StoryDetailPage() {
           </div>
         </div>
       )}
+
+      {organizeTarget && (
+        <OrganizeTestCaseModal
+          projectId={projectId}
+          testCase={organizeTarget}
+          onClose={() => setOrganizeTarget(null)}
+          onSaved={() => setOrganizeTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -563,7 +599,7 @@ function Stat({ label, value, tone }) {
   );
 }
 
-function ScenarioCard({ scenario: s, onStatusChange }) {
+function ScenarioCard({ scenario: s, onStatusChange, onOrganize }) {
   let preconditions = [];
   if (Array.isArray(s.preconditions)) preconditions = s.preconditions;
   else if (typeof s.preconditions === 'string') {
@@ -592,6 +628,16 @@ function ScenarioCard({ scenario: s, onStatusChange }) {
                          dark:text-emerald-400 dark:hover:bg-emerald-500/10 dark:ring-emerald-400/30"
             >
               <Check size={14} />
+            </button>
+          )}
+          {s.status === 'approved' && onOrganize && (
+            <button
+              onClick={() => onOrganize(s.id)}
+              title="Organize into folder"
+              className="w-7 h-7 rounded inline-flex items-center justify-center text-amber-600 hover:bg-amber-50 ring-1 ring-amber-200
+                         dark:text-amber-400 dark:hover:bg-amber-500/10 dark:ring-amber-400/30"
+            >
+              <FolderOpen size={14} />
             </button>
           )}
           {s.status !== 'rejected' && (
