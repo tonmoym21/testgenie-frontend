@@ -58,8 +58,9 @@ export default function StoryDetailPage() {
   const [manualSaving, setManualSaving] = useState(false);
   const [manualError, setManualError] = useState('');
 
-  // Post-approval organization modal — opened when a scenario approval returns a test case.
-  const [organizeTarget, setOrganizeTarget] = useState(null);
+  // Post-approval organization modal — array of test cases to organize at once.
+  // Single-case flows wrap in a 1-element array.
+  const [organizeTargets, setOrganizeTargets] = useState(null);
 
   // Manual AI scenario creation
   const [showAddModal, setShowAddModal] = useState(false);
@@ -115,21 +116,38 @@ export default function StoryDetailPage() {
     } catch (err) { alert('Delete failed: ' + err.message); }
   };
 
-  const handleStatusChange = async (scenarioId, newStatus) => {
+  // Update one scenario's status. When `silent` is set, the caller is responsible for
+  // surfacing errors and opening any post-approval UI. Returns the linked test case
+  // (if any) so callers can batch them up.
+  const handleStatusChange = async (scenarioId, newStatus, opts = {}) => {
+    const { silent = false } = opts;
     try {
       const updated = await updateScenarioStatus(projectId, storyId, scenarioId, newStatus);
-      // The backend strips linkedTestCase off the scenario row before persisting, but the
-      // response payload carries it for UI use. Don't store it in scenarios state.
       const { linkedTestCase, ...scenarioRow } = updated || {};
-      setScenarios((prev) => prev.map((s) => (s.id === scenarioId ? scenarioRow : s)));
-      const cov = await getCoverage(projectId, storyId);
-      setCoverage(cov);
-      // Approval just materialized (or refreshed the link to) a test_cases row — let the
-      // user decide where to file it. Skipping leaves it unfiled on the Test Cases page.
-      if (newStatus === 'approved' && linkedTestCase) {
-        setOrganizeTarget(linkedTestCase);
+      // Preserve the linked-test-case fields the GET endpoint adds — re-merge so the row
+      // doesn't lose them. If approval just produced a new linked test case, reflect it.
+      setScenarios((prev) => prev.map((s) => {
+        if (s.id !== scenarioId) return s;
+        const merged = { ...s, ...scenarioRow };
+        if (linkedTestCase) {
+          merged.linkedTestCaseId = linkedTestCase.id;
+          merged.linkedTestCaseFolderId = linkedTestCase.folderId ?? null;
+          merged.linkedTestCaseTitle = linkedTestCase.title;
+        }
+        return merged;
+      }));
+      if (!silent) {
+        const cov = await getCoverage(projectId, storyId);
+        setCoverage(cov);
+        if (newStatus === 'approved' && linkedTestCase) {
+          setOrganizeTargets([linkedTestCase]);
+        }
       }
-    } catch (err) { alert('Failed: ' + err.message); }
+      return linkedTestCase || null;
+    } catch (err) {
+      if (!silent) alert('Failed: ' + err.message);
+      throw err;
+    }
   };
 
   // Re-open the Organize modal for an already-approved scenario. Re-PATCHing to 'approved'
@@ -140,11 +158,28 @@ export default function StoryDetailPage() {
       const updated = await updateScenarioStatus(projectId, storyId, scenarioId, 'approved');
       const linkedTestCase = updated?.linkedTestCase;
       if (linkedTestCase) {
-        setOrganizeTarget(linkedTestCase);
+        setOrganizeTargets([linkedTestCase]);
       } else {
         alert('No linked test case found for this scenario. If this scenario was approved on an older build, try Reset → Approve to convert it.');
       }
     } catch (err) { alert('Failed: ' + err.message); }
+  };
+
+  // Open the Organize modal for every approved+linked scenario in this story.
+  // This is the user-triggered "do it all in one go" flow from the page header.
+  const handleOrganizeAllApproved = () => {
+    const linked = scenarios
+      .filter((s) => s.status === 'approved' && s.linkedTestCaseId)
+      .map((s) => ({
+        id: s.linkedTestCaseId,
+        title: s.linkedTestCaseTitle || s.title,
+        folderId: s.linkedTestCaseFolderId ?? null,
+      }));
+    if (linked.length === 0) {
+      alert('No approved test cases yet. Approve at least one scenario first.');
+      return;
+    }
+    setOrganizeTargets(linked);
   };
 
   const handleAddScenario = async (e) => {
@@ -172,7 +207,28 @@ export default function StoryDetailPage() {
 
   const handleBulkAction = async (category, newStatus) => {
     const targets = scenarios.filter((s) => s.category === category && s.status !== newStatus);
-    for (const t of targets) await handleStatusChange(t.id, newStatus);
+    if (targets.length === 0) return;
+
+    const linkedCases = [];
+    for (const t of targets) {
+      try {
+        const lc = await handleStatusChange(t.id, newStatus, { silent: true });
+        if (newStatus === 'approved' && lc) linkedCases.push(lc);
+      } catch (err) {
+        // Already swallowed silently; continue with the rest of the batch.
+      }
+    }
+
+    // Refresh coverage once at the end of the batch.
+    try {
+      const cov = await getCoverage(projectId, storyId);
+      setCoverage(cov);
+    } catch { /* non-fatal */ }
+
+    // After a bulk approve, open the Organize modal once for the whole batch.
+    if (newStatus === 'approved' && linkedCases.length > 0) {
+      setOrganizeTargets(linkedCases);
+    }
   };
 
   const handleExport = async () => {
@@ -394,6 +450,15 @@ export default function StoryDetailPage() {
                 <Plus size={14} /> Manual scenario
               </button>
               <button
+                onClick={handleOrganizeAllApproved}
+                disabled={approvedCount === 0}
+                className="btn-secondary btn-sm"
+                title="File every approved test case into a folder in one go"
+              >
+                <FolderOpen size={14} />
+                Organize ({approvedCount})
+              </button>
+              <button
                 onClick={handleExport}
                 disabled={!canExport || exporting}
                 className="btn-secondary btn-sm"
@@ -571,12 +636,22 @@ export default function StoryDetailPage() {
         </div>
       )}
 
-      {organizeTarget && (
+      {organizeTargets && organizeTargets.length > 0 && (
         <OrganizeTestCaseModal
           projectId={projectId}
-          testCase={organizeTarget}
-          onClose={() => setOrganizeTarget(null)}
-          onSaved={() => setOrganizeTarget(null)}
+          testCases={organizeTargets}
+          onClose={() => setOrganizeTargets(null)}
+          onSaved={(updated) => {
+            // Reflect new folder placements on the linked-test-case columns of each scenario
+            // so the Organize button stays accurate without a refetch.
+            const byId = new Map(updated.map((tc) => [tc.id, tc]));
+            setScenarios((prev) => prev.map((s) => {
+              if (!s.linkedTestCaseId || !byId.has(s.linkedTestCaseId)) return s;
+              const tc = byId.get(s.linkedTestCaseId);
+              return { ...s, linkedTestCaseFolderId: tc.folderId ?? null };
+            }));
+            setOrganizeTargets(null);
+          }}
         />
       )}
     </div>

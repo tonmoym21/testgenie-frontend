@@ -963,12 +963,14 @@ export default function ProjectTestCasesPage() {
       {organizeTarget && (
         <OrganizeTestCaseModal
           projectId={projectId}
-          testCase={organizeTarget}
+          testCases={[organizeTarget]}
           onClose={() => setOrganizeTarget(null)}
-          onSaved={(updated) => {
-            setTestCases((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+          onSaved={(updatedList) => {
+            const byId = new Map(updatedList.map((tc) => [tc.id, tc]));
+            setTestCases((prev) => prev.map((x) => (byId.has(x.id) ? byId.get(x.id) : x)));
             // If a new folder was created, refresh folders so it shows up in the tree.
-            if (updated.folderId && !folders.find((f) => f.id === updated.folderId)) {
+            const newFolderIds = updatedList.map((tc) => tc.folderId).filter(Boolean);
+            if (newFolderIds.some((fid) => !folders.find((f) => f.id === fid))) {
               api.getFolders(projectId).then((res) => setFolders(Array.isArray(res?.data) ? res.data : [])).catch(() => {});
             }
             setOrganizeTarget(null);
