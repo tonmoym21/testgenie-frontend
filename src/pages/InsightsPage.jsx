@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Activity, AlertTriangle, Bug, CheckCircle2,
-  Gauge, Loader2, Play, RefreshCw, Users,
+  Activity, Bug, CheckCircle2, Filter, GripVertical,
+  Gauge, Loader2, Pencil, Play, RefreshCw, Save, Users, X,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { setCurrentProjectId } from '../utils/currentProject';
+import { useAuth } from '../context/AuthContext';
+import { viewsApi } from '../services/viewsApi';
 import BackButton from '../components/BackButton';
+import ViewsDropdown from '../components/insights/ViewsDropdown';
+import FiltersDrawer from '../components/insights/FiltersDrawer';
+import { useReorderable } from '../components/insights/useReorderable';
 
 const TIME_RANGES = [
   { id: '1d',  label: '1D' },
@@ -21,6 +26,11 @@ const PRIORITY_TONES = {
   medium: 'bg-amber-500',
   low: 'bg-surface-400',
 };
+
+const DEFAULT_LAYOUT = [
+  'active-runs', 'closed-runs', 'defects',
+  'results', 'type-distribution', 'trend', 'statistics',
+];
 
 function SummaryCard({ label, value, sublabel, icon: Icon, tone = 'brand' }) {
   const tones = {
@@ -57,9 +67,7 @@ function SkeletonCard({ height = 'h-28' }) {
 
 function ResultsBar({ results }) {
   const total = Object.values(results || {}).reduce((a, b) => a + b, 0);
-  if (total === 0) {
-    return <div className="text-sm text-surface-400 dark:text-surface-500 py-6 text-center">No results from closed runs yet.</div>;
-  }
+  if (total === 0) return <div className="text-sm text-surface-400 dark:text-surface-500 py-6 text-center">No results from closed runs yet.</div>;
   const items = [
     { key: 'passed',   label: 'Passed',   tone: 'bg-emerald-500' },
     { key: 'failed',   label: 'Failed',   tone: 'bg-red-500' },
@@ -93,9 +101,7 @@ function ResultsBar({ results }) {
 
 function TypeDistribution({ dist }) {
   const total = Object.values(dist || {}).reduce((a, b) => a + b, 0);
-  if (total === 0) {
-    return <div className="text-sm text-surface-400 dark:text-surface-500 py-6 text-center">No test cases to categorize.</div>;
-  }
+  if (total === 0) return <div className="text-sm text-surface-400 dark:text-surface-500 py-6 text-center">No test cases to categorize.</div>;
   return (
     <ul className="space-y-3">
       {Object.entries(dist).map(([key, count]) => {
@@ -117,9 +123,7 @@ function TypeDistribution({ dist }) {
 }
 
 function TrendChart({ points }) {
-  if (!points || points.length === 0) {
-    return <div className="text-sm text-surface-400 dark:text-surface-500 py-6 text-center">No activity in this range.</div>;
-  }
+  if (!points || points.length === 0) return <div className="text-sm text-surface-400 dark:text-surface-500 py-6 text-center">No activity in this range.</div>;
   const width = 640;
   const height = 140;
   const pad = 8;
@@ -210,18 +214,99 @@ function DefectsPanel({ defects, projectId }) {
   );
 }
 
+// One draggable shell wrapping each detail widget so layout-edit mode can
+// reorder them. The shell adds the grip handle, drop highlight, and grid-span.
+function WidgetShell({ id, span, editing, bindReorder, dragging, over, children }) {
+  const dragProps = editing ? bindReorder(id) : {};
+  return (
+    <div
+      {...dragProps}
+      className={`relative ${span === 2 ? 'lg:col-span-2' : ''}
+        ${editing ? 'ring-1 ring-dashed ring-surface-300 dark:ring-surface-600 rounded-xl' : ''}
+        ${editing && dragging === id ? 'opacity-40' : ''}
+        ${editing && over === id && dragging && dragging !== id ? 'ring-2 ring-brand-500 dark:ring-lime-400' : ''}
+      `}
+    >
+      {editing && (
+        <div className="absolute top-2 right-2 z-10 px-1.5 py-1 rounded-md bg-surface-900/80 text-white text-[10px] uppercase tracking-wide flex items-center gap-1 cursor-grab active:cursor-grabbing">
+          <GripVertical size={11} /> Drag
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
 export default function InsightsPage() {
   const { projectId } = useParams();
+  const { canManageTeam: isAdmin } = useAuth();
+
   const [project, setProject] = useState(null);
   const [insights, setInsights] = useState(null);
-  const [range, setRange] = useState('30d');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
+  // View + filter state.
+  const [views, setViews] = useState([]);
+  const [activeViewId, setActiveViewId] = useState(null);
+  const [range, setRange] = useState('30d');
+  const [filters, setFilters] = useState(viewsApi.defaultFilters());
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Layout-edit state. `layout` is the per-user order of detail widgets.
+  const [layout, setLayout] = useState(DEFAULT_LAYOUT);
+  const [layoutEditing, setLayoutEditing] = useState(false);
+  const [layoutDirty, setLayoutDirty] = useState(false);
+  const [savedHint, setSavedHint] = useState('');
+
+  // Bootstrap views + layout on project change.
   useEffect(() => {
-    if (projectId) setCurrentProjectId(projectId);
+    if (!projectId) return;
+    setCurrentProjectId(projectId);
+
+    let cancelled = false;
+    (async () => {
+      const list = await viewsApi.list(projectId).catch(() => []);
+      if (cancelled) return;
+      setViews(list);
+
+      const activeId = viewsApi.getActiveViewId(projectId);
+      if (activeId) {
+        const v = list.find((x) => x.id === activeId);
+        if (v) applyView(v);
+      }
+
+      const userLayout = viewsApi.getUserLayout(projectId)
+        || viewsApi.getOrgDefaultLayout(projectId);
+      if (userLayout && Array.isArray(userLayout) && userLayout.length === DEFAULT_LAYOUT.length) {
+        setLayout(userLayout);
+      } else {
+        setLayout(DEFAULT_LAYOUT);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  function applyView(v) {
+    setActiveViewId(v.id);
+    if (v.config?.range) setRange(v.config.range);
+    if (v.config?.filters) setFilters({ ...viewsApi.defaultFilters(), ...v.config.filters });
+  }
+
+  const activeView = useMemo(
+    () => views.find((v) => v.id === activeViewId) || null,
+    [views, activeViewId],
+  );
+
+  // Detect when current state has drifted from the active view.
+  const isDirty = useMemo(() => {
+    if (!activeView) return false;
+    const cfg = activeView.config || {};
+    if ((cfg.range || '30d') !== range) return true;
+    return JSON.stringify(cfg.filters || {}) !== JSON.stringify(filters);
+  }, [activeView, range, filters]);
 
   const load = useMemo(() => async (showRefresh = false) => {
     if (!projectId) return;
@@ -247,11 +332,215 @@ export default function InsightsPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, range]);
 
+  // ----- View handlers -----
+  const handleSelectView = (id) => {
+    const v = views.find((x) => x.id === id);
+    if (!v) return;
+    applyView(v);
+    viewsApi.setActiveViewId(projectId, id);
+  };
+
+  const handleCreateView = async () => {
+    const name = prompt('Name this view:', activeView ? `${activeView.name} (variant)` : 'My view');
+    if (!name) return;
+    const v = await viewsApi.create(projectId, {
+      name,
+      scope: 'personal',
+      config: { range, filters, sort: 'recent', layout },
+    });
+    setViews((prev) => [...prev, v]);
+    setActiveViewId(v.id);
+    viewsApi.setActiveViewId(projectId, v.id);
+  };
+
+  const handleRenameView = async (v) => {
+    const name = prompt('Rename view:', v.name);
+    if (!name || name === v.name) return;
+    const updated = await viewsApi.update(v.id, { name });
+    setViews((prev) => prev.map((x) => (x.id === v.id ? updated : x)));
+  };
+
+  const handleDuplicateView = async (v) => {
+    const copy = await viewsApi.duplicate(v.id);
+    setViews((prev) => [...prev, copy]);
+  };
+
+  const handleDeleteView = async (v) => {
+    if (!confirm(`Delete "${v.name}"?`)) return;
+    await viewsApi.remove(v.id);
+    setViews((prev) => prev.filter((x) => x.id !== v.id));
+    if (activeViewId === v.id) {
+      setActiveViewId(null);
+      viewsApi.setActiveViewId(projectId, null);
+    }
+  };
+
+  const handleShareToggle = async (v) => {
+    const nextScope = v.scope === 'org' ? 'personal' : 'org';
+    const updated = await viewsApi.update(v.id, { scope: nextScope });
+    setViews((prev) => prev.map((x) => (x.id === v.id ? updated : x)));
+  };
+
+  const handleSaveDirty = async () => {
+    if (!activeView) return;
+    const updated = await viewsApi.update(activeView.id, {
+      config: { ...activeView.config, range, filters },
+    });
+    setViews((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    setSavedHint('View updated');
+    setTimeout(() => setSavedHint(''), 1800);
+  };
+
+  // ----- Filter handlers -----
+  const filterCount =
+    (filters.dateFrom ? 1 : 0) + (filters.dateTo ? 1 : 0) +
+    (filters.owners?.length || 0) + (filters.statuses?.length || 0) +
+    (filters.priorities?.length || 0) + (filters.teams?.length || 0) +
+    (filters.tags?.length || 0);
+
+  const handleClearFilters = () => setFilters(viewsApi.defaultFilters());
+
+  // ----- Layout handlers -----
+  const { bind: bindReorder, dragging, over } = useReorderable({
+    order: layout,
+    enabled: layoutEditing,
+    onReorder: (next) => { setLayout(next); setLayoutDirty(true); },
+  });
+
+  const enterLayoutEdit = () => { setLayoutEditing(true); setLayoutDirty(false); };
+  const cancelLayoutEdit = () => {
+    const saved = viewsApi.getUserLayout(projectId)
+      || viewsApi.getOrgDefaultLayout(projectId)
+      || DEFAULT_LAYOUT;
+    setLayout(saved);
+    setLayoutEditing(false);
+    setLayoutDirty(false);
+  };
+  const saveLayout = () => {
+    viewsApi.setUserLayout(projectId, layout);
+    setLayoutEditing(false);
+    setLayoutDirty(false);
+    setSavedHint('Layout saved');
+    setTimeout(() => setSavedHint(''), 1800);
+  };
+  const saveLayoutAsOrgDefault = () => {
+    viewsApi.setOrgDefaultLayout(projectId, layout);
+    viewsApi.setUserLayout(projectId, layout);
+    setLayoutEditing(false);
+    setLayoutDirty(false);
+    setSavedHint('Saved as org default');
+    setTimeout(() => setSavedHint(''), 1800);
+  };
+
   const data = insights;
+
+  // Render the detail widgets in current layout order. Each entry is a
+  // self-contained card so reordering is just shuffling the wrappers.
+  const detailWidgets = {
+    'active-runs': (
+      <WidgetShell id="active-runs" editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+              <Play size={16} className="text-emerald-600 dark:text-emerald-400" /> Active runs
+            </h3>
+            <Link to={`/projects/${projectId}/test-runs?state=in_progress`} className="text-xs text-brand-600 hover:text-brand-700 dark:text-lime-400 dark:hover:text-lime-300 font-medium">View →</Link>
+          </div>
+          {loading ? <div className="skeleton h-10 w-20" /> : (
+            <>
+              <p className="text-3xl font-semibold text-surface-900 dark:text-surface-50 tabular-nums">{data?.runs.active ?? 0}</p>
+              <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">new + in progress</p>
+            </>
+          )}
+        </div>
+      </WidgetShell>
+    ),
+    'closed-runs': (
+      <WidgetShell id="closed-runs" editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-brand-600 dark:text-lime-400" /> Closed runs
+            </h3>
+            <Link to={`/projects/${projectId}/test-runs?state=closed`} className="text-xs text-brand-600 hover:text-brand-700 dark:text-lime-400 dark:hover:text-lime-300 font-medium">View →</Link>
+          </div>
+          {loading ? <div className="skeleton h-10 w-20" /> : (
+            <>
+              <p className="text-3xl font-semibold text-surface-900 dark:text-surface-50 tabular-nums">{data?.runs.closed ?? 0}</p>
+              <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">completed + closed</p>
+            </>
+          )}
+        </div>
+      </WidgetShell>
+    ),
+    'defects': (
+      <WidgetShell id="defects" editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+              <Bug size={16} className="text-red-600 dark:text-red-400" /> Defects logged
+            </h3>
+          </div>
+          {loading ? <div className="skeleton h-24 w-full" /> : (
+            <DefectsPanel defects={data?.defects || { total: 0, open: 0, resolved: 0 }} projectId={projectId} />
+          )}
+        </div>
+      </WidgetShell>
+    ),
+    'results': (
+      <WidgetShell id="results" span={2} editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Results from closed runs</h3>
+          </div>
+          {loading ? <div className="skeleton h-24 w-full" /> : (
+            <ResultsBar results={data?.results || {}} />
+          )}
+        </div>
+      </WidgetShell>
+    ),
+    'type-distribution': (
+      <WidgetShell id="type-distribution" editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Type of test cases</h3>
+          </div>
+          {loading ? <div className="skeleton h-24 w-full" /> : (
+            <TypeDistribution dist={data?.typeDistribution || {}} />
+          )}
+        </div>
+      </WidgetShell>
+    ),
+    'trend': (
+      <WidgetShell id="trend" span={2} editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Trend of test cases</h3>
+          </div>
+          {loading ? <div className="skeleton h-32 w-full" /> : (
+            <TrendChart points={data?.trend || []} />
+          )}
+        </div>
+      </WidgetShell>
+    ),
+    'statistics': (
+      <WidgetShell id="statistics" editing={layoutEditing} bindReorder={bindReorder} dragging={dragging} over={over}>
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Statistics</h3>
+          </div>
+          {loading ? <div className="skeleton h-24 w-full" /> : (
+            <StatisticsCards insights={data || { summary: {}, runs: {}, defects: {} }} />
+          )}
+        </div>
+      </WidgetShell>
+    ),
+  };
 
   return (
     <div className="page">
       <BackButton to="/projects" label="Back to projects" />
+
       {/* Header */}
       <div className="page-header">
         <div className="min-w-0">
@@ -263,8 +552,8 @@ export default function InsightsPage() {
             {project?.name ? `Overview for ${project.name}` : 'Project activity and coverage'}
           </p>
         </div>
+
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Time range */}
           <div className="inline-flex rounded-lg ring-1 ring-surface-200 bg-white p-0.5 dark:bg-surface-900 dark:ring-surface-700" role="tablist" aria-label="Time range">
             {TIME_RANGES.map((r) => (
               <button
@@ -282,11 +571,81 @@ export default function InsightsPage() {
               </button>
             ))}
           </div>
+
+          <ViewsDropdown
+            views={views}
+            activeView={activeView}
+            isAdmin={isAdmin}
+            onSelect={handleSelectView}
+            onCreate={handleCreateView}
+            onRename={handleRenameView}
+            onDuplicate={handleDuplicateView}
+            onDelete={handleDeleteView}
+            onShareToggle={handleShareToggle}
+          />
+
+          {isDirty && (
+            <button onClick={handleSaveDirty} className="btn-secondary btn-sm" title="Save changes to active view">
+              <Save size={14} /> Save view
+            </button>
+          )}
+
+          <button
+            onClick={() => setFiltersOpen((f) => !f)}
+            className="btn-secondary btn-sm"
+            aria-expanded={filtersOpen}
+          >
+            <Filter size={14} />
+            Filters
+            {filterCount > 0 && (
+              <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-semibold rounded-full bg-brand-600 text-white dark:bg-lime-500 dark:text-surface-950">
+                {filterCount}
+              </span>
+            )}
+          </button>
+
+          {!layoutEditing ? (
+            <button onClick={enterLayoutEdit} className="btn-secondary btn-sm" title="Drag-reorder widgets">
+              <Pencil size={14} /> Edit layout
+            </button>
+          ) : (
+            <>
+              <button onClick={saveLayout} disabled={!layoutDirty} className="btn-primary btn-sm">
+                <Save size={14} /> Save layout
+              </button>
+              {isAdmin && (
+                <button onClick={saveLayoutAsOrgDefault} disabled={!layoutDirty} className="btn-secondary btn-sm" title="Make this the default layout for everyone in the org">
+                  <Users size={14} /> Save as org default
+                </button>
+              )}
+              <button onClick={cancelLayoutEdit} className="btn-ghost btn-sm">
+                <X size={14} /> Cancel
+              </button>
+            </>
+          )}
+
           <button onClick={() => load(true)} disabled={refreshing || loading} className="btn-secondary btn-sm">
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Refresh
           </button>
         </div>
       </div>
+
+      {savedHint && (
+        <div role="status" className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-emerald-50 text-emerald-700 text-xs dark:bg-emerald-500/10 dark:text-emerald-200">
+          <CheckCircle2 size={12} /> {savedHint}
+        </div>
+      )}
+
+      {filtersOpen && (
+        <FiltersDrawer
+          open={filtersOpen}
+          filters={filters}
+          projectName={project?.name}
+          onChange={setFilters}
+          onClear={handleClearFilters}
+          onClose={() => setFiltersOpen(false)}
+        />
+      )}
 
       {error && (
         <div role="alert" className="mb-6 card p-4 bg-red-50/80 border border-red-200 dark:bg-red-500/10 dark:border-red-400/30">
@@ -294,7 +653,7 @@ export default function InsightsPage() {
         </div>
       )}
 
-      {/* Summary cards */}
+      {/* Summary cards (fixed; not part of drag-reorder per spec — drag-reorder only) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {loading ? (
           <>
@@ -334,91 +693,9 @@ export default function InsightsPage() {
         )}
       </div>
 
-      {/* Detailed widgets */}
+      {/* Reorderable detail widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Active runs */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
-              <Play size={16} className="text-emerald-600 dark:text-emerald-400" /> Active runs
-            </h3>
-            <Link to={`/projects/${projectId}/test-runs?state=in_progress`} className="text-xs text-brand-600 hover:text-brand-700 dark:text-lime-400 dark:hover:text-lime-300 font-medium">View →</Link>
-          </div>
-          {loading ? <div className="skeleton h-10 w-20" /> : (
-            <>
-              <p className="text-3xl font-semibold text-surface-900 dark:text-surface-50 tabular-nums">{data?.runs.active ?? 0}</p>
-              <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">new + in progress</p>
-            </>
-          )}
-        </div>
-
-        {/* Closed runs */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-brand-600 dark:text-lime-400" /> Closed runs
-            </h3>
-            <Link to={`/projects/${projectId}/test-runs?state=closed`} className="text-xs text-brand-600 hover:text-brand-700 dark:text-lime-400 dark:hover:text-lime-300 font-medium">View →</Link>
-          </div>
-          {loading ? <div className="skeleton h-10 w-20" /> : (
-            <>
-              <p className="text-3xl font-semibold text-surface-900 dark:text-surface-50 tabular-nums">{data?.runs.closed ?? 0}</p>
-              <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">completed + closed</p>
-            </>
-          )}
-        </div>
-
-        {/* Defects */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
-              <Bug size={16} className="text-red-600 dark:text-red-400" /> Defects logged
-            </h3>
-          </div>
-          {loading ? <div className="skeleton h-24 w-full" /> : (
-            <DefectsPanel defects={data?.defects || { total: 0, open: 0, resolved: 0 }} projectId={projectId} />
-          )}
-        </div>
-
-        {/* Results from closed runs */}
-        <div className="card p-5 lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Results from closed runs</h3>
-          </div>
-          {loading ? <div className="skeleton h-24 w-full" /> : (
-            <ResultsBar results={data?.results || {}} />
-          )}
-        </div>
-
-        {/* Type distribution */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Type of test cases</h3>
-          </div>
-          {loading ? <div className="skeleton h-24 w-full" /> : (
-            <TypeDistribution dist={data?.typeDistribution || {}} />
-          )}
-        </div>
-
-        {/* Trend */}
-        <div className="card p-5 lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Trend of test cases</h3>
-          </div>
-          {loading ? <div className="skeleton h-32 w-full" /> : (
-            <TrendChart points={data?.trend || []} />
-          )}
-        </div>
-
-        {/* Statistics summary */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-surface-800 dark:text-surface-100">Statistics</h3>
-          </div>
-          {loading ? <div className="skeleton h-24 w-full" /> : (
-            <StatisticsCards insights={data || { summary: {}, runs: {}, defects: {} }} />
-          )}
-        </div>
+        {layout.map((id) => detailWidgets[id]).filter(Boolean)}
       </div>
 
       {loading && (
