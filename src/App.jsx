@@ -63,7 +63,7 @@ export default function App() {
 
       {/* Projects */}
       <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
-      <Route path="/projects/:projectId" element={<ProtectedRoute><InsightsPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId" element={<ProtectedRoute><ProjectTestCasesPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/insights" element={<ProtectedRoute><InsightsPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/test-cases" element={<ProtectedRoute><ProjectTestCasesPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/test-plans" element={<ProtectedRoute><TestPlansPage /></ProtectedRoute>} />
