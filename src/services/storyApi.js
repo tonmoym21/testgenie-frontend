@@ -4,7 +4,7 @@ import { api } from './api';
 
 const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost:3000'
-  : 'https://testgenie-backend-production.up.railway.app';
+  : 'https://testgenie-backend-g9fu.onrender.com';
 
 /**
  * Build auth headers, ensuring the token is fresh via api service.

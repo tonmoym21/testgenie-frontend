@@ -1,6 +1,6 @@
 const API_BASE = window.location.hostname === 'localhost'
   ? '/api'
-  : 'https://testgenie-backend-production.up.railway.app/api';
+  : 'https://testgenie-backend-g9fu.onrender.com/api';
 
 /** Normalize raw token values coming from localStorage — reject the string literals
  *  "undefined" / "null" / empty / whitespace that can leak in from older bugs. */

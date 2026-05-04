@@ -41,7 +41,7 @@ export function ExportCsvButton({ projectId, selectedTestCaseIds = null, disable
 
       const API_BASE = window.location.hostname === 'localhost'
         ? '/api'
-        : 'https://testgenie-backend-production.up.railway.app/api';
+        : 'https://testgenie-backend-g9fu.onrender.com/api';
       const response = await fetch(
         `${API_BASE}/projects/${encodeURIComponent(projectId)}/testcases/export-csv`,
         {
