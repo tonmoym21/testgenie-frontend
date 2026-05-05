@@ -4,7 +4,7 @@ import { api } from '../services/api';
 import {
   ArrowLeft, Plus, Loader2, Trash2, Play, CheckCircle, XCircle, Clock, Globe,
   Monitor, ChevronDown, ChevronUp, Copy, Check, Edit2, X, Lock, Share2,
-  Link2, Zap, AlertCircle,
+  Link2, Zap, AlertCircle, Pencil,
 } from 'lucide-react';
 
 const API_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
@@ -502,6 +502,9 @@ export default function CollectionDetailPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [editingTest, setEditingTest] = useState(null);
   const [showShare, setShowShare] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [savingRename, setSavingRename] = useState(false);
 
   // Run state
   const [running, setRunning] = useState(false);
@@ -524,6 +527,19 @@ export default function CollectionDetailPage() {
   }, [collectionId]);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleRename = async (e) => {
+    e.preventDefault();
+    const next = renameValue.trim();
+    if (!next || next === collection?.name) { setRenaming(false); return; }
+    setSavingRename(true);
+    try {
+      const updated = await api.request('PATCH', '/collections/' + collectionId, { name: next });
+      setCollection((prev) => ({ ...prev, name: updated.name }));
+      setRenaming(false);
+    } catch (err) { console.error(err); }
+    finally { setSavingRename(false); }
+  };
 
   const handleAddTest = async (name, testDef) => {
     await api.request('POST', '/collections/' + collectionId + '/tests', { name, testType: 'api', testDefinition: testDef });
@@ -638,7 +654,34 @@ export default function CollectionDetailPage() {
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">{collection.name}</h1>
+          {renaming ? (
+            <form onSubmit={handleRename} className="flex items-center gap-2">
+              <input
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Escape') setRenaming(false); }}
+                className="input text-2xl font-semibold py-1 px-2"
+                autoFocus
+                required
+              />
+              <button type="submit" disabled={savingRename} className="btn-primary">
+                {savingRename ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Save
+              </button>
+              <button type="button" onClick={() => setRenaming(false)} className="btn-secondary"><X size={14} /></button>
+            </form>
+          ) : (
+            <div className="flex items-center gap-2 group">
+              <h1 className="text-2xl font-semibold">{collection.name}</h1>
+              <button
+                onClick={() => { setRenameValue(collection.name); setRenaming(true); }}
+                className="icon-btn opacity-0 group-hover:opacity-100 transition-opacity hover:text-brand-600"
+                aria-label="Rename collection"
+                title="Rename collection"
+              >
+                <Pencil size={16} />
+              </button>
+            </div>
+          )}
           {collection.description && <p className="text-surface-500 text-sm mt-1">{collection.description}</p>}
           <p className="text-xs text-surface-400 mt-1">{tests.length} test{tests.length !== 1 ? 's' : ''}</p>
         </div>

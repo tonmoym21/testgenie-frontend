@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { Plus, Library, Loader2, Trash2, ChevronRight, X } from 'lucide-react';
+import { Plus, Library, Loader2, Trash2, ChevronRight, X, Pencil } from 'lucide-react';
 
 export default function CollectionsPage() {
   const [collections, setCollections] = useState([]);
@@ -11,6 +11,10 @@ export default function CollectionsPage() {
   const [desc, setDesc] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState(null); // { id, name, description }
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -30,6 +34,28 @@ export default function CollectionsPage() {
       setShowCreate(false); setName(''); setDesc(''); load();
     } catch (err) { setError(err.message); }
     finally { setCreating(false); }
+  };
+
+  const openEdit = (e, col) => {
+    e.preventDefault(); e.stopPropagation();
+    setEditing(col);
+    setEditName(col.name || '');
+    setEditDesc(col.description || '');
+  };
+
+  const handleEditSave = async (e) => {
+    e.preventDefault();
+    if (!editing) return;
+    setSavingEdit(true);
+    try {
+      const updated = await api.request('PATCH', '/collections/' + editing.id, {
+        name: editName,
+        description: editDesc || null,
+      });
+      setCollections((prev) => prev.map((c) => (c.id === editing.id ? { ...c, name: updated.name, description: updated.description } : c)));
+      setEditing(null);
+    } catch (err) { setError(err.message); }
+    finally { setSavingEdit(false); }
   };
 
   const handleDelete = async (e, id) => {
@@ -88,6 +114,36 @@ export default function CollectionsPage() {
         </div>
       )}
 
+      {editing && (
+        <div className="fixed inset-0 bg-surface-950/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setEditing(null)}>
+          <div className="card p-6 w-full max-w-md shadow-soft-lg animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-surface-900">Rename collection</h2>
+                <p className="text-sm text-surface-500 mt-0.5">Update the title or description.</p>
+              </div>
+              <button onClick={() => setEditing(null)} className="icon-btn" aria-label="Close"><X size={16} /></button>
+            </div>
+            <form onSubmit={handleEditSave} className="space-y-4">
+              <div>
+                <label className="label">Name</label>
+                <input value={editName} onChange={(e) => setEditName(e.target.value)} className="input" required autoFocus />
+              </div>
+              <div>
+                <label className="label">Description <span className="text-surface-400 font-normal">(optional)</span></label>
+                <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="input resize-none" rows={3} />
+              </div>
+              <div className="flex gap-3 justify-end pt-2">
+                <button type="button" onClick={() => setEditing(null)} className="btn-secondary">Cancel</button>
+                <button type="submit" disabled={savingEdit || !editName.trim()} className="btn-primary">
+                  {savingEdit && <Loader2 size={16} className="animate-spin" />} Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {loading && (
         <div className="space-y-2">
           {[1,2,3].map((i) => (
@@ -124,6 +180,7 @@ export default function CollectionsPage() {
                   {col.description && <span className="truncate">{col.description}</span>}
                 </div>
               </div>
+              <button onClick={(e) => openEdit(e, col)} className="icon-btn opacity-0 group-hover:opacity-100 transition-opacity hover:text-brand-600" aria-label="Rename"><Pencil size={15} /></button>
               <button onClick={(e) => handleDelete(e, col.id)} className="icon-btn opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500" aria-label="Delete"><Trash2 size={15} /></button>
               <ChevronRight size={16} className="text-surface-300 group-hover:text-brand-500 transition-colors" />
             </Link>
