@@ -53,12 +53,30 @@ const HEADER_ALIASES = {
 
 function resolveHeaderMap(headers) {
   const map = {};
+  const stepCols = [];     // [{ n, idx }] for Step1, Step 2, TestStep3...
+  const expectedCols = []; // [{ n, idx }] for ExpectedResult1, Expected 2...
   headers.forEach((h, idx) => {
     const nk = normKey(h);
+    let matched = false;
     for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
-      if (aliases.includes(nk)) { map[field] = idx; break; }
+      if (aliases.includes(nk)) { map[field] = idx; matched = true; break; }
     }
+    if (matched) return;
+    // Numbered step columns: step1, step01, teststep2, stepaction3...
+    let m = nk.match(/^(?:test)?step(?:action|description)?(\d+)$/);
+    if (m) { stepCols.push({ n: parseInt(m[1], 10), idx }); return; }
+    // Numbered expected-result columns
+    m = nk.match(/^(?:expected(?:result)?|result)(\d+)$/);
+    if (m) { expectedCols.push({ n: parseInt(m[1], 10), idx }); return; }
   });
+  if (stepCols.length) {
+    stepCols.sort((a, b) => a.n - b.n);
+    map.__stepCols = stepCols;
+  }
+  if (expectedCols.length) {
+    expectedCols.sort((a, b) => a.n - b.n);
+    map.__expectedCols = expectedCols;
+  }
   return map;
 }
 
@@ -70,8 +88,28 @@ function rowToTestCase(row, map) {
   const lines = [];
   const desc = get('description');
   const pre = get('preconditions');
-  const steps = get('steps');
-  const expected = get('expected');
+  let steps = get('steps');
+  let expected = get('expected');
+
+  // Collect numbered Step1/Step2/... columns when no single Steps column was used.
+  if (!steps && map.__stepCols?.length) {
+    const numbered = map.__stepCols
+      .map(({ n, idx }) => ({ n, txt: (row[idx] || '').trim() }))
+      .filter((s) => s.txt);
+    if (numbered.length) {
+      steps = numbered.map((s) => `${s.n}. ${s.txt}`).join('\n');
+    }
+  }
+  // Collect numbered ExpectedResult1/2/... columns similarly.
+  if (!expected && map.__expectedCols?.length) {
+    const numbered = map.__expectedCols
+      .map(({ n, idx }) => ({ n, txt: (row[idx] || '').trim() }))
+      .filter((s) => s.txt);
+    if (numbered.length) {
+      expected = numbered.map((s) => `${s.n}. ${s.txt}`).join('\n');
+    }
+  }
+
   if (desc) { lines.push('## Description', desc, ''); }
   if (pre) { lines.push('## Preconditions', pre, ''); }
   if (steps) {
