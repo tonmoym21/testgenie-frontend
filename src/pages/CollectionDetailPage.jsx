@@ -251,13 +251,15 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
   const [activeTab, setActiveTab] = useState('params');
   const [saving, setSaving] = useState(false);
 
-  const [authType, setAuthType] = useState('none');
-  const [bearerToken, setBearerToken] = useState('');
-  const [apiKeyName, setApiKeyName] = useState('');
-  const [apiKeyValue, setApiKeyValue] = useState('');
-  const [apiKeyLocation, setApiKeyLocation] = useState('header');
-  const [basicUsername, setBasicUsername] = useState('');
-  const [basicPassword, setBasicPassword] = useState('');
+  const savedAuth = def?.config?.auth || {};
+  const [authType, setAuthType] = useState(savedAuth.type || 'none');
+  const [bearerToken, setBearerToken] = useState(savedAuth.token || '');
+  const [apiKeyName, setApiKeyName] = useState(savedAuth.keyName || '');
+  const [apiKeyValue, setApiKeyValue] = useState(savedAuth.keyValue || '');
+  const [apiKeyLocation, setApiKeyLocation] = useState(savedAuth.keyLocation || 'header');
+  const [basicUsername, setBasicUsername] = useState(savedAuth.username || '');
+  const [basicPassword, setBasicPassword] = useState(savedAuth.password || '');
+  const [basicLoginUrl, setBasicLoginUrl] = useState(savedAuth.loginUrl || '');
 
   const [headers, setHeaders] = useState(def?.config?.headers ? Object.entries(def.config.headers).map(([key, value]) => ({ key, value, enabled: true })) : []);
   const [queryParams, setQueryParams] = useState([]);
@@ -308,6 +310,19 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
         try { parsedBody = JSON.parse(apiBody); } catch { throw new Error('Invalid JSON body'); }
       }
       const validExtractors = extractors.filter((e) => e.name && e.path);
+      const buildAuth = () => {
+        if (authType === 'none') return undefined;
+        if (authType === 'bearer') return { type: 'bearer', token: bearerToken };
+        if (authType === 'api_key') return { type: 'api_key', keyName: apiKeyName, keyValue: apiKeyValue, keyLocation: apiKeyLocation };
+        if (authType === 'basic') return {
+          type: 'basic',
+          username: basicUsername,
+          password: basicPassword,
+          ...(basicLoginUrl ? { loginUrl: basicLoginUrl } : {}),
+        };
+        return undefined;
+      };
+      const auth = buildAuth();
       const testDef = {
         name: testName,
         type: 'api',
@@ -324,6 +339,7 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
             ...(a.path ? { path: a.path } : {}),
           })),
           ...(validExtractors.length > 0 ? { extractors: validExtractors } : {}),
+          ...(auth ? { auth } : {}),
         },
       };
       await onSave(testName, testDef);
@@ -395,6 +411,16 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
                 )}
                 {authType === 'basic' && (
                   <div className="bg-surface-50 rounded-lg p-4 space-y-3">
+                    <div>
+                      <label className="text-xs text-surface-500 mb-1 block">Login URL <span className="text-surface-400 font-normal">(optional)</span></label>
+                      <input
+                        value={basicLoginUrl}
+                        onChange={(e) => setBasicLoginUrl(e.target.value)}
+                        className="input py-1.5 text-sm"
+                        placeholder="https://api.example.com/login"
+                      />
+                      <p className="text-[11px] text-surface-400 mt-1">If set, the runner POSTs Basic credentials here before the request to capture session cookies.</p>
+                    </div>
                     <div><label className="text-xs text-surface-500 mb-1 block">Username</label><input value={basicUsername} onChange={(e) => setBasicUsername(e.target.value)} className="input py-1.5 text-sm" /></div>
                     <div><label className="text-xs text-surface-500 mb-1 block">Password</label><input value={basicPassword} onChange={(e) => setBasicPassword(e.target.value)} className="input py-1.5 text-sm" type="password" /></div>
                   </div>

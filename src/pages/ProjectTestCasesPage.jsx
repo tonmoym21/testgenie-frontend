@@ -405,6 +405,21 @@ export default function ProjectTestCasesPage() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+  const bulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm(`Delete ${ids.length} test case${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    setBulkBusy(true);
+    try {
+      for (const id of ids) {
+        await api.deleteTestCase(projectId, id);
+      }
+      setTestCases((prev) => prev.filter((tc) => !selectedIds.has(tc.id)));
+      clearSelection();
+    } catch (err) { setError(err.message); }
+    finally { setBulkBusy(false); }
+  };
+
   const bulkEditSingle = () => {
     if (selectedIds.size !== 1) return;
     const id = Array.from(selectedIds)[0];
@@ -661,6 +676,9 @@ export default function ProjectTestCasesPage() {
               </button>
               <button onClick={bulkExport} className="btn-secondary btn-sm">
                 <Download size={14}/> Export
+              </button>
+              <button onClick={bulkDelete} disabled={bulkBusy} className="btn-secondary btn-sm hover:!bg-red-50 hover:!text-red-700 hover:!border-red-200">
+                {bulkBusy ? <Loader2 size={14} className="animate-spin"/> : <Trash2 size={14}/>} Delete
               </button>
               <button onClick={clearSelection} className="text-sm text-surface-600 hover:text-surface-900 ml-auto">Clear</button>
             </div>
