@@ -82,7 +82,8 @@ function resolveHeaderMap(headers) {
 
 // Merge BrowserStack-style continuation rows (rows with no Title that hold
 // additional Steps / Expected Results for the preceding test case) into a
-// single grouped record.
+// single grouped record. Each entry in `pairs` corresponds to one CSV row's
+// (Steps cell, Expected Result cell) — possibly multiple sub-steps inside.
 function groupRows(body, map) {
   const get = (row, k) => (map[k] != null ? (row[map[k]] || '').trim() : '');
   const groups = [];
@@ -92,16 +93,68 @@ function groupRows(body, map) {
     const stepText = get(row, 'steps');
     const expectedText = get(row, 'expected');
     if (title) {
-      current = { row, steps: [], expecteds: [] };
-      if (stepText) current.steps.push(stepText);
-      if (expectedText) current.expecteds.push(expectedText);
+      current = { row, pairs: [] };
+      if (stepText || expectedText) current.pairs.push({ step: stepText, expected: expectedText });
       groups.push(current);
     } else if (current && (stepText || expectedText)) {
-      if (stepText) current.steps.push(stepText);
-      if (expectedText) current.expecteds.push(expectedText);
+      current.pairs.push({ step: stepText, expected: expectedText });
     }
   }
   return groups;
+}
+
+// Split a Steps cell that contains a numbered list ("1. foo\n2. bar 3. baz")
+// into individual step strings. Falls back to the whole cell if no numbering.
+function splitNumberedSteps(cellText) {
+  const text = String(cellText || '').trim();
+  if (!text) return [];
+  // Find positions where a "N." or "N)" begins a step (start of string or after a newline).
+  const re = /(?:^|\n)\s*\d+[.)]\s+/g;
+  const positions = [];
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    positions.push({ start: m.index + m[0].length, prefixStart: m.index });
+  }
+  if (positions.length === 0) return [text];
+  const out = [];
+  for (let i = 0; i < positions.length; i++) {
+    const startIdx = positions[i].start;
+    const endIdx = i + 1 < positions.length ? positions[i + 1].prefixStart : text.length;
+    const piece = text.slice(startIdx, endIdx).trim();
+    if (piece) out.push(piece);
+  }
+  return out.length ? out : [text];
+}
+
+// Collapse multi-line text into a single line so it survives parseContent()
+// which treats indented continuation lines as additional step content.
+function singleLine(s) {
+  return String(s || '').replace(/\s+/g, ' ').trim();
+}
+
+function buildStepEntries(group, map, row) {
+  const entries = []; // { step, result }
+  for (const { step: stepCell, expected: expCell } of group.pairs) {
+    const subs = splitNumberedSteps(stepCell);
+    const expected = (expCell || '').trim();
+    if (subs.length === 0) {
+      if (expected) entries.push({ step: '', result: expected });
+      continue;
+    }
+    subs.forEach((s, i) => {
+      const isLast = i === subs.length - 1;
+      entries.push({ step: s, result: isLast ? expected : '' });
+    });
+  }
+  // Fallback: numbered Step1/Step2/... columns paired with ExpectedResult1/2/...
+  if (entries.length === 0 && map.__stepCols?.length) {
+    const expByN = new Map((map.__expectedCols || []).map(({ n, idx }) => [n, (row[idx] || '').trim()]));
+    map.__stepCols.forEach(({ n, idx }) => {
+      const txt = (row[idx] || '').trim();
+      if (txt) entries.push({ step: txt, result: expByN.get(n) || '' });
+    });
+  }
+  return entries;
 }
 
 function rowToTestCase(group, map) {
@@ -113,37 +166,20 @@ function rowToTestCase(group, map) {
   const lines = [];
   const desc = get('description');
   const pre = get('preconditions');
-  let steps = group.steps.join('\n');
-  let expected = group.expecteds.join('\n');
-
-  // Collect numbered Step1/Step2/... columns when no single Steps column was used.
-  if (!steps && map.__stepCols?.length) {
-    const numbered = map.__stepCols
-      .map(({ n, idx }) => ({ n, txt: (row[idx] || '').trim() }))
-      .filter((s) => s.txt);
-    if (numbered.length) {
-      steps = numbered.map((s) => `${s.n}. ${s.txt}`).join('\n');
-    }
-  }
-  // Collect numbered ExpectedResult1/2/... columns similarly.
-  if (!expected && map.__expectedCols?.length) {
-    const numbered = map.__expectedCols
-      .map(({ n, idx }) => ({ n, txt: (row[idx] || '').trim() }))
-      .filter((s) => s.txt);
-    if (numbered.length) {
-      expected = numbered.map((s) => `${s.n}. ${s.txt}`).join('\n');
-    }
-  }
+  const stepEntries = buildStepEntries(group, map, row);
 
   if (desc) { lines.push('## Description', desc, ''); }
   if (pre) { lines.push('## Preconditions', pre, ''); }
-  if (steps) {
+  if (stepEntries.length) {
     lines.push('## Steps');
-    lines.push(steps);
-    if (expected) { lines.push('', '## Expected', expected); }
+    stepEntries.forEach((s, i) => {
+      const stepText = singleLine(s.step) || '(no step text)';
+      lines.push(`${i + 1}. ${stepText}`);
+      if (s.result) {
+        lines.push(`   → Expected: ${singleLine(s.result)}`);
+      }
+    });
     lines.push('');
-  } else if (expected) {
-    lines.push('## Expected', expected, '');
   }
   const meta = [];
   const type = get('type'); if (type) meta.push(`- Type: ${type}`);
