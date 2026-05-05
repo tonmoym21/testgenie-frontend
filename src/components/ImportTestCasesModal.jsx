@@ -80,7 +80,32 @@ function resolveHeaderMap(headers) {
   return map;
 }
 
-function rowToTestCase(row, map) {
+// Merge BrowserStack-style continuation rows (rows with no Title that hold
+// additional Steps / Expected Results for the preceding test case) into a
+// single grouped record.
+function groupRows(body, map) {
+  const get = (row, k) => (map[k] != null ? (row[map[k]] || '').trim() : '');
+  const groups = [];
+  let current = null;
+  for (const row of body) {
+    const title = get(row, 'title');
+    const stepText = get(row, 'steps');
+    const expectedText = get(row, 'expected');
+    if (title) {
+      current = { row, steps: [], expecteds: [] };
+      if (stepText) current.steps.push(stepText);
+      if (expectedText) current.expecteds.push(expectedText);
+      groups.push(current);
+    } else if (current && (stepText || expectedText)) {
+      if (stepText) current.steps.push(stepText);
+      if (expectedText) current.expecteds.push(expectedText);
+    }
+  }
+  return groups;
+}
+
+function rowToTestCase(group, map) {
+  const row = group.row;
   const get = (k) => (map[k] != null ? (row[map[k]] || '').trim() : '');
   const title = get('title');
   if (!title) return null;
@@ -88,8 +113,8 @@ function rowToTestCase(row, map) {
   const lines = [];
   const desc = get('description');
   const pre = get('preconditions');
-  let steps = get('steps');
-  let expected = get('expected');
+  let steps = group.steps.join('\n');
+  let expected = group.expecteds.join('\n');
 
   // Collect numbered Step1/Step2/... columns when no single Steps column was used.
   if (!steps && map.__stepCols?.length) {
@@ -175,7 +200,8 @@ export default function ImportTestCasesModal({ folderName, onClose, onImport }) 
         if (map.title == null) {
           throw new Error(`Could not find a "Title" column. Detected columns: ${headers.join(', ')}`);
         }
-        cases = body.map((r) => rowToTestCase(r, map)).filter(Boolean);
+        const groups = groupRows(body, map);
+        cases = groups.map((g) => rowToTestCase(g, map)).filter(Boolean);
       }
       if (cases.length === 0) throw new Error('No valid test cases found in file');
       setParsed(cases);
