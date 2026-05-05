@@ -7,23 +7,30 @@ import { api } from '../services/api';
 
 // Parse the markdown content produced by buildContent() back into structured fields.
 function parseContent(content) {
-  const out = { description: '', preconditions: '', steps: [] };
+  const out = {
+    description: '', preconditions: '', steps: [],
+    type: '', state: '', automation: '', productArea: '',
+    scenario: '', testCaseRef: '', tags: [], requirements: '',
+    owner: '', template: '',
+  };
   if (!content || typeof content !== 'string') return out;
   const lines = content.split(/\r?\n/);
   let section = null;
   const buckets = { description: [], preconditions: [] };
   const stepEntries = [];
   let current = null;
+  const metaLines = [];
   for (const raw of lines) {
     const line = raw.replace(/\s+$/, '');
     const h = /^##\s+(.+)/.exec(line);
     if (h) {
+      if (current) { stepEntries.push(current); current = null; }
       const title = h[1].trim().toLowerCase();
       if (title.startsWith('description')) section = 'description';
       else if (title.startsWith('precondition')) section = 'preconditions';
       else if (title.startsWith('step')) section = 'steps';
+      else if (title.startsWith('metadata')) section = 'metadata';
       else section = null;
-      current = null;
       continue;
     }
     if (!section) continue;
@@ -37,6 +44,8 @@ function parseContent(content) {
       const e = /^\s+(?:→\s*)?Expected:\s*(.*)$/i.exec(line);
       if (e && current) { current.result = e[1]; continue; }
       if (current && line.trim()) current.step += '\n' + line.trim();
+    } else if (section === 'metadata') {
+      metaLines.push(line);
     } else {
       buckets[section].push(line);
     }
@@ -45,6 +54,30 @@ function parseContent(content) {
   out.description = buckets.description.join('\n').trim();
   out.preconditions = buckets.preconditions.join('\n').trim();
   out.steps = stepEntries;
+
+  // Parse "- Key: value" metadata lines (case-insensitive keys, flexible aliases).
+  const aliasMap = {
+    type: 'type', state: 'state', status: 'state',
+    automation: 'automation', 'automation status': 'automation',
+    'product area': 'productArea', area: 'productArea', module: 'productArea', component: 'productArea',
+    scenario: 'scenario', 'test case ref': 'testCaseRef', 'test case': 'testCaseRef',
+    tags: 'tags', labels: 'tags',
+    requirements: 'requirements',
+    owner: 'owner', assignee: 'owner', 'created by': 'owner',
+    template: 'template',
+  };
+  for (const ml of metaLines) {
+    const m = /^\s*-\s*([^:]+):\s*(.+?)\s*$/.exec(ml);
+    if (!m) continue;
+    const key = aliasMap[m[1].trim().toLowerCase()];
+    if (!key) continue;
+    const val = m[2];
+    if (key === 'tags') {
+      out.tags = val.split(/[,;]/).map((t) => t.trim()).filter(Boolean);
+    } else {
+      out[key] = val;
+    }
+  }
   return out;
 }
 
@@ -94,12 +127,17 @@ function LabeledField({ label, required, children, hint }) {
 
 export default function CreateTestCaseModal({ folderName, onClose, onSubmit, editingCase, projectId }) {
   const isEdit = !!editingCase;
-  const initial = isEdit ? parseContent(editingCase.content) : { description: '', preconditions: '', steps: [] };
+  const initial = isEdit ? parseContent(editingCase.content) : {
+    description: '', preconditions: '', steps: [],
+    type: '', state: '', automation: '', productArea: '',
+    scenario: '', testCaseRef: '', tags: [], requirements: '',
+    owner: '', template: '',
+  };
   const [title, setTitle] = useState(editingCase?.title || '');
   const [showDescription, setShowDescription] = useState(!!initial.description);
   const [description, setDescription] = useState(initial.description || '');
   const [preconditions, setPreconditions] = useState(initial.preconditions || '');
-  const [template, setTemplate] = useState('Test Case Steps');
+  const [template, setTemplate] = useState(initial.template || 'Test Case Steps');
   const [steps, setSteps] = useState(() => {
     if (isEdit && initial.steps.length > 0) {
       return initial.steps.map((s, i) => ({ id: i + 1, step: s.step || '', result: s.result || '' }));
@@ -111,18 +149,18 @@ export default function CreateTestCaseModal({ folderName, onClose, onSubmit, edi
   const [assigneeUserId, setAssigneeUserId] = useState(editingCase?.assigneeUserId || '');
   const [members, setMembers] = useState([]);
 
-  // Sidebar fields
-  const [owner, setOwner] = useState('Myself (Tonmoy Malakar)');
-  const [state, setState] = useState('Active');
+  // Sidebar fields — hydrated from parsed metadata when editing.
+  const [owner, setOwner] = useState(initial.owner || 'Myself (Tonmoy Malakar)');
+  const [state, setState] = useState(initial.state || 'Active');
   const [priority, setPriority] = useState(editingCase?.priority || 'medium');
-  const [type, setType] = useState('Other');
-  const [productArea, setProductArea] = useState('');
-  const [automationStatus, setAutomationStatus] = useState('Not Automated');
-  const [testCaseRef, setTestCaseRef] = useState('');
-  const [tags, setTags] = useState([]);
+  const [type, setType] = useState(initial.type || 'Other');
+  const [productArea, setProductArea] = useState(initial.productArea || '');
+  const [automationStatus, setAutomationStatus] = useState(initial.automation || 'Not Automated');
+  const [testCaseRef, setTestCaseRef] = useState(initial.testCaseRef || '');
+  const [tags, setTags] = useState(initial.tags || []);
   const [tagInput, setTagInput] = useState('');
-  const [scenario, setScenario] = useState('');
-  const [requirements, setRequirements] = useState('');
+  const [scenario, setScenario] = useState(initial.scenario || '');
+  const [requirements, setRequirements] = useState(initial.requirements || '');
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
