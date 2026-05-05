@@ -512,8 +512,8 @@ export default function ProjectTestCasesPage() {
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* Page header */}
       <div className="px-6 pt-5 pb-3 border-b border-surface-200/70 dark:border-surface-800 bg-white/80 dark:bg-surface-950/80">
-        <Link to={`/projects/${projectId}`} className="inline-flex items-center gap-1.5 text-xs text-surface-500 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-100 mb-2 transition-colors">
-          <ArrowLeft size={12} /> Back to project
+        <Link to="/projects" className="inline-flex items-center gap-1.5 text-xs text-surface-500 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-100 mb-2 transition-colors">
+          <ArrowLeft size={12} /> Back to projects
         </Link>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
