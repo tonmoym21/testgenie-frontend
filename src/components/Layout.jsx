@@ -5,7 +5,7 @@ import {
   FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings,
   Clock, Bot, Users, Search, ChevronsLeft, ChevronsRight, ChevronDown,
   ChevronRight, Sparkles, HelpCircle, FileText, ClipboardList, Puzzle,
-  BookOpen, Activity, Sun, Moon,
+  BookOpen, Activity, Sun, Moon, ScrollText,
 } from 'lucide-react';
 
 import { getCurrentProjectId } from '../utils/currentProject';
@@ -31,6 +31,7 @@ const NAV_GROUPS = [
         match: ['/projects', '/test-cases', '/test-runs', '/test-plans', '/reports', '/executions', '/stories', '/automation'] },
       { path: '/integrations', label: 'Integrations', icon: Puzzle, match: ['/integrations', '/jira'] },
       { path: '/settings', label: 'Settings', icon: Settings, match: ['/settings', '/team', '/environments', '/globals'] },
+      { path: '/audit-logs', label: 'Audit logs', icon: ScrollText, match: ['/audit-logs'], adminOnly: true },
     ],
   },
 ];
@@ -225,6 +226,7 @@ export default function Layout({ children }) {
               )}
               <div className="space-y-0.5">
                 {group.items.map((item) => {
+                  if (item.adminOnly && !canManageTeam) return null;
                   if (item.parent && item.key === 'projects') {
                     return (
                       <div key="projects">

@@ -32,6 +32,7 @@ import TestRunsPage from './pages/TestRunsPage';
 import CreateTestRunPage from './pages/CreateTestRunPage';
 import TestRunDetailPage from './pages/TestRunDetailPage';
 import InsightsPage from './pages/InsightsPage';
+import AuditLogsPage from './pages/AuditLogsPage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -97,6 +98,7 @@ export default function App() {
       <Route path="/team" element={<ProtectedRoute><TeamPage /></ProtectedRoute>} />
       <Route path="/environments" element={<ProtectedRoute><EnvironmentsPage /></ProtectedRoute>} />
       <Route path="/globals" element={<ProtectedRoute><GlobalsPage /></ProtectedRoute>} />
+      <Route path="/audit-logs" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
 
       {/* Legacy / other */}
       <Route path="/run-test" element={<Navigate to="/projects" replace />} />

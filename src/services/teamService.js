@@ -118,10 +118,31 @@ export const teamApi = {
     const query = new URLSearchParams();
     if (params.action) query.set('action', params.action);
     if (params.actorId) query.set('actorId', params.actorId);
+    if (params.status) query.set('status', params.status);
+    if (params.search) query.set('search', params.search);
+    if (params.dateFrom) query.set('dateFrom', params.dateFrom);
+    if (params.dateTo) query.set('dateTo', params.dateTo);
     if (params.limit) query.set('limit', params.limit);
     if (params.offset) query.set('offset', params.offset);
     const queryStr = query.toString();
     return api.request('GET', `/team/audit-logs${queryStr ? '?' + queryStr : ''}`);
+  },
+
+  /**
+   * Returns the absolute CSV URL with current access token appended so a
+   * plain `<a href>` download works without custom auth handling.
+   */
+  auditLogsCsvUrl(params = {}) {
+    const query = new URLSearchParams();
+    if (params.action) query.set('action', params.action);
+    if (params.actorId) query.set('actorId', params.actorId);
+    if (params.status) query.set('status', params.status);
+    if (params.search) query.set('search', params.search);
+    if (params.dateFrom) query.set('dateFrom', params.dateFrom);
+    if (params.dateTo) query.set('dateTo', params.dateTo);
+    if (api.accessToken) query.set('token', api.accessToken);
+    const base = api.API_BASE || '';
+    return `${base}/team/audit-logs.csv?${query.toString()}`;
   },
 
   // ─────────────────────────────────────────────────────────────────────────
