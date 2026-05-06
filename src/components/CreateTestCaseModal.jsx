@@ -11,7 +11,7 @@ function parseContent(content) {
     description: '', preconditions: '', steps: [],
     type: '', state: '', automation: '', productArea: '',
     scenario: '', testCaseRef: '', tags: [], requirements: '',
-    owner: '', template: '',
+    owner: '', template: '', folderPath: '',
   };
   if (!content || typeof content !== 'string') return out;
   const lines = content.split(/\r?\n/);
@@ -65,6 +65,7 @@ function parseContent(content) {
     requirements: 'requirements',
     owner: 'owner', assignee: 'owner', 'created by': 'owner',
     template: 'template',
+    'folder path': 'folderPath', folder: 'folderPath', path: 'folderPath',
   };
   for (const ml of metaLines) {
     const m = /^\s*-\s*([^:]+):\s*(.+?)\s*$/.exec(ml);
@@ -161,6 +162,7 @@ export default function CreateTestCaseModal({ folderName, onClose, onSubmit, edi
   const [tagInput, setTagInput] = useState('');
   const [scenario, setScenario] = useState(initial.scenario || '');
   const [requirements, setRequirements] = useState(initial.requirements || '');
+  const [folderPath] = useState(initial.folderPath || '');
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -281,6 +283,7 @@ export default function CreateTestCaseModal({ folderName, onClose, onSubmit, edi
     if (requirements.trim()) meta.push(`- Requirements: ${requirements.trim()}`);
     if (owner) meta.push(`- Owner: ${owner}`);
     if (template) meta.push(`- Template: ${template}`);
+    if (folderPath) meta.push(`- Folder Path: ${folderPath}`);
     if (attachments.length) meta.push(`- Attachments: ${attachments.map((a) => a.name).join(', ')}`);
     if (meta.length) { lines.push('## Metadata', ...meta); }
     return lines.join('\n');

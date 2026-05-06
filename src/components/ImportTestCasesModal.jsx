@@ -49,6 +49,8 @@ const HEADER_ALIASES = {
   scenario: ['scenario'],
   automation: ['automationstatus', 'automation'],
   productarea: ['productarea', 'module', 'component'],
+  folderpath: ['folderpath', 'folder', 'path'],
+  template: ['template'],
 };
 
 function resolveHeaderMap(headers) {
@@ -141,9 +143,11 @@ function buildStepEntries(group, map, row) {
       if (expected) entries.push({ step: '', result: expected });
       continue;
     }
-    subs.forEach((s, i) => {
-      const isLast = i === subs.length - 1;
-      entries.push({ step: s, result: isLast ? expected : '' });
+    // BrowserStack-style sources hold one Expected Result for the whole pair
+    // of steps. Mirror it onto every sub-step so each row shows it in the
+    // per-step Expected field after import.
+    subs.forEach((s) => {
+      entries.push({ step: s, result: expected });
     });
   }
   // Fallback: numbered Step1/Step2/... columns paired with ExpectedResult1/2/...
@@ -189,6 +193,8 @@ function rowToTestCase(group, map) {
   const scen = get('scenario'); if (scen) meta.push(`- Scenario: ${scen}`);
   const tags = get('tags'); if (tags) meta.push(`- Tags: ${tags}`);
   const owner = get('owner'); if (owner) meta.push(`- Owner: ${owner}`);
+  const tmpl = get('template'); if (tmpl) meta.push(`- Template: ${tmpl}`);
+  const fpath = get('folderpath'); if (fpath) meta.push(`- Folder Path: ${fpath}`);
   if (meta.length) lines.push('## Metadata', ...meta);
 
   const rawPriority = normKey(get('priority'));
