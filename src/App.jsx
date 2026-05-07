@@ -33,15 +33,28 @@ import CreateTestRunPage from './pages/CreateTestRunPage';
 import TestRunDetailPage from './pages/TestRunDetailPage';
 import InsightsPage from './pages/InsightsPage';
 import AuditLogsPage from './pages/AuditLogsPage';
+import HelpPage from './pages/HelpPage';
+
+// Hold a redirect decision until auth has finished its initial cookie-refresh
+// attempt — otherwise a reload with a valid session briefly bounces to /login.
+function AuthGate() {
+  return (
+    <div className="flex items-center justify-center min-h-screen text-gray-500">
+      <div className="animate-pulse">Loading…</div>
+    </div>
+  );
+}
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, authReady } = useAuth();
+  if (!authReady) return <AuthGate />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <Layout>{children}</Layout>;
 }
 
 function PublicRoute({ children }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, authReady } = useAuth();
+  if (!authReady) return <AuthGate />;
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
   return children;
 }
@@ -99,6 +112,9 @@ export default function App() {
       <Route path="/environments" element={<ProtectedRoute><EnvironmentsPage /></ProtectedRoute>} />
       <Route path="/globals" element={<ProtectedRoute><GlobalsPage /></ProtectedRoute>} />
       <Route path="/audit-logs" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
+
+      {/* Help / Documentation */}
+      <Route path="/help" element={<ProtectedRoute><HelpPage /></ProtectedRoute>} />
 
       {/* Legacy / other */}
       <Route path="/run-test" element={<Navigate to="/projects" replace />} />

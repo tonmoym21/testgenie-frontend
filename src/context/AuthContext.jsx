@@ -23,21 +23,25 @@ function decodeToken(token) {
 }
 
 export function AuthProvider({ children }) {
+  // Gate protected routes until the initial refresh attempt resolves. Without
+  // this, a reload with a valid cookie but expired access token would briefly
+  // show user=null → ProtectedRoute redirects to /login → cookie refresh
+  // resolves → bounces back. This flag prevents that flash.
+  const initialDecoded = decodeToken(localStorage.getItem('accessToken'));
   const [user, setUser] = useState(() => {
-    const token = localStorage.getItem('accessToken');
-    const decoded = decodeToken(token);
-    if (decoded) {
+    if (initialDecoded) {
       return {
-        id: decoded.id,
-        email: decoded.email,
-        orgId: decoded.orgId,
-        role: decoded.role,
+        id: initialDecoded.id,
+        email: initialDecoded.email,
+        orgId: initialDecoded.orgId,
+        role: initialDecoded.role,
       };
     }
-    // Access token missing or expired — useEffect will attempt a blind refresh
-    // (HttpOnly cookie carries the refresh token, no localStorage gate).
     return null;
   });
+  // If we already have a valid access token, we're ready. Otherwise the mount
+  // effect flips this true after attempting a cookie refresh.
+  const [authReady, setAuthReady] = useState(!!initialDecoded);
 
   const refreshTimerRef = useRef(null);
 
@@ -82,6 +86,7 @@ export function AuthProvider({ children }) {
 
     if (decoded) {
       scheduleRefresh();
+      // authReady was already true from initial state; nothing to do.
     } else {
       api.tryRefreshToken().then((success) => {
         if (success) {
@@ -100,6 +105,8 @@ export function AuthProvider({ children }) {
           api.clearTokens();
           setUser(null);
         }
+      }).finally(() => {
+        setAuthReady(true);
       });
     }
 
@@ -188,6 +195,7 @@ export function AuthProvider({ children }) {
       registerWithInvite,
       logout,
       isAuthenticated: !!user,
+      authReady,
       canManageTeam,
       isOwner,
       hasOrganization,
