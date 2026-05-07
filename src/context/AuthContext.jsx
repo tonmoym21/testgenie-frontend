@@ -34,12 +34,8 @@ export function AuthProvider({ children }) {
         role: decoded.role,
       };
     }
-
-    // Access token expired but refresh token may still be valid — we'll try refresh in useEffect
-    const refreshToken = localStorage.getItem('refreshToken');
-    if (refreshToken) return null; // will attempt refresh on mount
-
-    // No tokens at all
+    // Access token missing or expired — useEffect will attempt a blind refresh
+    // (HttpOnly cookie carries the refresh token, no localStorage gate).
     return null;
   });
 
@@ -78,14 +74,15 @@ export function AuthProvider({ children }) {
     }, refreshIn);
   }, []);
 
-  // On mount: if access token expired but refresh exists, try refresh once
+  // On mount: if access token is valid use it; otherwise blindly attempt a
+  // refresh — the HttpOnly cookie tells us whether a session exists.
   useEffect(() => {
     const accessToken = localStorage.getItem('accessToken');
-    const refreshToken = localStorage.getItem('refreshToken');
     const decoded = decodeToken(accessToken);
 
-    if (!decoded && refreshToken) {
-      // Access token expired, try refresh
+    if (decoded) {
+      scheduleRefresh();
+    } else {
       api.tryRefreshToken().then((success) => {
         if (success) {
           const newToken = localStorage.getItem('accessToken');
@@ -104,8 +101,6 @@ export function AuthProvider({ children }) {
           setUser(null);
         }
       });
-    } else if (decoded) {
-      scheduleRefresh();
     }
 
     // Listen for session expiry from api.js (e.g., 401 after refresh failure)

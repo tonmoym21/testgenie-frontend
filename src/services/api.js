@@ -1,6 +1,10 @@
-const API_BASE = window.location.hostname === 'localhost'
-  ? '/api'
-  : 'https://testgenie-backend-g9fu.onrender.com/api';
+// Prefer build-time env (VITE_API_BASE). Fall back to dev-proxy when running
+// against vite's localhost server, then to the production backend.
+const API_BASE =
+  (import.meta.env && import.meta.env.VITE_API_BASE) ||
+  (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? '/api'
+    : 'https://testgenie-backend-g9fu.onrender.com/api');
 
 /** Normalize raw token values coming from localStorage — reject the string literals
  *  "undefined" / "null" / empty / whitespace that can leak in from older bugs. */
@@ -35,36 +39,30 @@ function jwtExpiryMs(token) {
 class ApiService {
   constructor() {
     this.accessToken = normalizeToken(localStorage.getItem('accessToken'));
-    this.refreshToken = normalizeToken(localStorage.getItem('refreshToken'));
-
-    // Self-heal: wipe out any garbage values so future reads are clean.
     if (!this.accessToken) localStorage.removeItem('accessToken');
-    if (!this.refreshToken) localStorage.removeItem('refreshToken');
+
+    // Refresh token is now an HttpOnly cookie set by the backend; no longer
+    // stored in localStorage. One-time cleanup of legacy values.
+    localStorage.removeItem('refreshToken');
 
     this._refreshPromise = null;
     this._onSessionExpired = null;
     this.API_BASE = API_BASE;
   }
 
-  setTokens(accessToken, refreshToken) {
+  // refreshToken arg is accepted for backward compat with login response shape
+  // but is no longer persisted client-side — the HttpOnly cookie carries it.
+  setTokens(accessToken, _refreshToken) {
     const at = normalizeToken(accessToken);
-    const rt = normalizeToken(refreshToken);
-    if (!at || !rt) {
-      // Do NOT store bad values — silently ignore. Caller should treat as failure.
-      return false;
-    }
+    if (!at) return false;
     this.accessToken = at;
-    this.refreshToken = rt;
     localStorage.setItem('accessToken', at);
-    localStorage.setItem('refreshToken', rt);
     return true;
   }
 
   clearTokens() {
     this.accessToken = null;
-    this.refreshToken = null;
     localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
   }
 
   isAuthenticated() { return !!this.accessToken; }
@@ -77,7 +75,6 @@ class ApiService {
 
   async ensureValidToken() {
     if (this.isAccessTokenValid()) return true;
-    if (!this.refreshToken) return false;
     return this.tryRefreshToken();
   }
 
@@ -89,7 +86,7 @@ class ApiService {
   }
 
   async request(method, path, body = null, retry = true) {
-    if (retry && !this.isAccessTokenValid() && this.refreshToken) {
+    if (retry && !this.isAccessTokenValid()) {
       const refreshed = await this.tryRefreshToken();
       if (!refreshed) {
         this.clearTokens();
@@ -118,7 +115,7 @@ class ApiService {
       throw err;
     }
 
-    if (res.status === 401 && retry && this.refreshToken) {
+    if (res.status === 401 && retry) {
       const refreshed = await this.tryRefreshToken();
       if (refreshed) return this.request(method, path, body, false);
       this.clearTokens();
@@ -165,19 +162,26 @@ class ApiService {
   }
 
   async _doRefresh() {
-    const rt = normalizeToken(this.refreshToken);
-    if (!rt) return false;
     try {
       const res = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: rt }),
+        credentials: 'include', // send the HttpOnly refresh cookie
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        console.warn('[api] refresh failed', { status: res.status });
+        return false;
+      }
       const data = await res.json().catch(() => null);
-      if (!data || !data.accessToken || !data.refreshToken) return false;
-      return this.setTokens(data.accessToken, data.refreshToken);
-    } catch { return false; }
+      if (!data || !data.accessToken) {
+        console.warn('[api] refresh response missing access token');
+        return false;
+      }
+      return this.setTokens(data.accessToken);
+    } catch (err) {
+      console.warn('[api] refresh threw', err);
+      return false;
+    }
   }
 
   onSessionExpired(cb) { this._onSessionExpired = cb; }
@@ -218,21 +222,45 @@ class ApiService {
   // ── Auth ──────────────────────────────────────────────────────────────────
   async register(email, password) { return this.request('POST', '/auth/register', { email, password }); }
   async login(email, password) {
-    const data = await this.request('POST', '/auth/login', { email, password });
-    this.setTokens(data.accessToken, data.refreshToken);
+    // Login fetch must include credentials so the Set-Cookie response is honored.
+    const headers = { 'Content-Type': 'application/json' };
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      });
+    } catch (networkErr) {
+      const err = new Error(`Network error: ${networkErr.message}`);
+      err.code = 'NETWORK_ERROR';
+      err.status = 0;
+      throw err;
+    }
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const error = new Error(extractErrorMessage(data, res.status));
+      error.code = data?.error?.code;
+      error.status = res.status;
+      error.body = data;
+      throw error;
+    }
+    this.setTokens(data.accessToken);
     return data;
   }
   async logout() {
     try {
-      if (this.refreshToken) {
-        await fetch(`${API_BASE}/auth/logout`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: this.refreshToken }),
-        });
-      }
-    } catch { /* ignore */ }
-    finally { this.clearTokens(); }
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+    } catch (err) {
+      console.warn('[api] logout threw', err);
+    } finally {
+      this.clearTokens();
+    }
   }
 
   // ── Projects ──────────────────────────────────────────────────────────────
