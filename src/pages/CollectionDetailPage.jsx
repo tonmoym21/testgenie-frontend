@@ -271,11 +271,12 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
   const initialBodyType = def?.config?.bodyType
     || (def?.config?.body !== undefined && def?.config?.body !== null ? 'json' : 'none');
   const [bodyType, setBodyType] = useState(initialBodyType);
-  const [apiBody, setApiBody] = useState(
-    def?.config?.bodyType === 'json' || (!def?.config?.bodyType && def?.config?.body)
-      ? (typeof def.config.body === 'string' ? def.config.body : JSON.stringify(def.config.body, null, 2))
-      : ''
-  );
+  const [apiBody, setApiBody] = useState(() => {
+    const b = def?.config?.body;
+    const isJsonMode = def?.config?.bodyType === 'json' || (!def?.config?.bodyType && b !== undefined && b !== null);
+    if (!isJsonMode || b === undefined || b === null) return '';
+    return typeof b === 'string' ? b : JSON.stringify(b, null, 2);
+  });
   const [rawBody, setRawBody] = useState(def?.config?.bodyType === 'raw' && typeof def?.config?.body === 'string' ? def.config.body : '');
   const [rawLang, setRawLang] = useState(def?.config?.rawLanguage || 'text');
   const [formDataFields, setFormDataFields] = useState(
