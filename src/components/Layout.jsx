@@ -338,8 +338,21 @@ export default function Layout({ children }) {
             <input
               id="global-search"
               type="search"
+              readOnly
               placeholder="Search projects, tests, executions…"
-              className="w-full pl-9 pr-16 py-2 text-sm rounded-lg bg-surface-100/70 border border-transparent placeholder:text-surface-400
+              onFocus={(e) => {
+                e.target.blur();
+                window.dispatchEvent(new CustomEvent('open-command-palette'));
+              }}
+              onClick={() => window.dispatchEvent(new CustomEvent('open-command-palette'))}
+              onKeyDown={(e) => {
+                if (e.key.length === 1 || e.key === 'Backspace') {
+                  e.preventDefault();
+                  const seed = e.key.length === 1 ? e.key : '';
+                  window.dispatchEvent(new CustomEvent('open-command-palette', { detail: { query: seed } }));
+                }
+              }}
+              className="w-full pl-9 pr-16 py-2 text-sm rounded-lg bg-surface-100/70 border border-transparent placeholder:text-surface-400 cursor-pointer
                          hover:bg-surface-100 focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none
                          transition-colors
                          dark:bg-surface-900/70 dark:text-surface-100 dark:placeholder:text-surface-500

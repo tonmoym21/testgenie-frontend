@@ -210,6 +210,19 @@ export default function CommandPalette() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, selectedIndex, flatCommands]);
 
+  // Allow other parts of the UI (the header global-search input, /-key
+  // shortcut, etc.) to open the palette and optionally seed the query.
+  useEffect(() => {
+    const handleOpen = (e) => {
+      setIsOpen(true);
+      const q = e?.detail?.query;
+      if (typeof q === 'string') setSearchQuery(q);
+      setSelectedIndex(0);
+    };
+    window.addEventListener('open-command-palette', handleOpen);
+    return () => window.removeEventListener('open-command-palette', handleOpen);
+  }, []);
+
   // Focus input when palette opens
   useEffect(() => {
     if (isOpen && inputRef.current) {
