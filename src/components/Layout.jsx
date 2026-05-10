@@ -369,14 +369,16 @@ export default function Layout({ children }) {
             >
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <Link
-              to="/help"
+            <a
+              href="/help"
+              target="_blank"
+              rel="noopener"
               className="icon-btn"
-              title="Help & documentation"
+              title="Help & documentation (opens in a new tab)"
               aria-label="Help and documentation"
             >
               <HelpCircle size={16} />
-            </Link>
+            </a>
           </div>
         </header>
 
