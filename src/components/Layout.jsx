@@ -369,16 +369,14 @@ export default function Layout({ children }) {
             >
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <a
-              href="https://github.com/anthropics/claude-code/issues"
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              to="/help"
               className="icon-btn"
-              title="Help"
-              aria-label="Help"
+              title="Help & documentation"
+              aria-label="Help and documentation"
             >
               <HelpCircle size={16} />
-            </a>
+            </Link>
           </div>
         </header>
 
