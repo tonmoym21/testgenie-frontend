@@ -10,6 +10,25 @@ import {
 const API_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 const ASSERTION_TARGETS = ['status', 'body', 'header', 'response_time'];
 const ASSERTION_OPERATORS = ['equals', 'contains', 'greater_than', 'less_than', 'exists', 'matches'];
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB cap (files are stored inline as base64)
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const idx = result.indexOf(',');
+      resolve({
+        filename: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        size: file.size,
+        data: idx >= 0 ? result.slice(idx + 1) : result, // strip data URL prefix → pure base64
+      });
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 // ── Response Viewer ──────────────────────────────────────────────────────────
 function ResponseViewer({ result, onClose }) {
@@ -247,7 +266,42 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
   const [testName, setTestName] = useState(initialData?.name || '');
   const [apiMethod, setApiMethod] = useState(def?.config?.method || 'GET');
   const [apiUrl, setApiUrl] = useState(def?.config?.url || '');
-  const [apiBody, setApiBody] = useState(def?.config?.body ? JSON.stringify(def.config.body, null, 2) : '');
+
+  // Body — Postman-style multi-mode
+  const initialBodyType = def?.config?.bodyType
+    || (def?.config?.body !== undefined && def?.config?.body !== null ? 'json' : 'none');
+  const [bodyType, setBodyType] = useState(initialBodyType);
+  const [apiBody, setApiBody] = useState(
+    def?.config?.bodyType === 'json' || (!def?.config?.bodyType && def?.config?.body)
+      ? (typeof def.config.body === 'string' ? def.config.body : JSON.stringify(def.config.body, null, 2))
+      : ''
+  );
+  const [rawBody, setRawBody] = useState(def?.config?.bodyType === 'raw' && typeof def?.config?.body === 'string' ? def.config.body : '');
+  const [rawLang, setRawLang] = useState(def?.config?.rawLanguage || 'text');
+  const [formDataFields, setFormDataFields] = useState(
+    Array.isArray(def?.config?.formData)
+      ? def.config.formData.map((f) => ({
+          key: f.key || '',
+          value: f.value || '',
+          enabled: f.enabled !== false,
+          type: f.type === 'file' ? 'file' : 'text',
+          file: f.file || null,
+        }))
+      : []
+  );
+  const [urlEncodedFields, setUrlEncodedFields] = useState(
+    Array.isArray(def?.config?.urlEncoded)
+      ? def.config.urlEncoded.map((f) => ({ key: f.key || '', value: f.value || '', enabled: f.enabled !== false }))
+      : []
+  );
+  const [binaryFile, setBinaryFile] = useState(def?.config?.binary || null);
+  const [graphqlQuery, setGraphqlQuery] = useState(def?.config?.graphql?.query || '');
+  const [graphqlVars, setGraphqlVars] = useState(
+    def?.config?.graphql?.variables
+      ? (typeof def.config.graphql.variables === 'string' ? def.config.graphql.variables : JSON.stringify(def.config.graphql.variables, null, 2))
+      : ''
+  );
+
   const [activeTab, setActiveTab] = useState('params');
   const [saving, setSaving] = useState(false);
 
@@ -282,6 +336,30 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
   const removeExtractor = (i) => setExtractors(extractors.filter((_, idx) => idx !== i));
   const updateExtractor = (i, f, v) => { const u = [...extractors]; u[i] = { ...u[i], [f]: v }; setExtractors(u); };
 
+  const addFormDataField = () => setFormDataFields([...formDataFields, { key: '', value: '', enabled: true, type: 'text', file: null }]);
+  const setFormDataFieldFile = async (i, fileObj) => {
+    if (!fileObj) { updateFormDataField(i, 'file', null); return; }
+    if (fileObj.size > MAX_UPLOAD_BYTES) { alert('File exceeds 5 MB limit'); return; }
+    try {
+      const file = await readFileAsBase64(fileObj);
+      const u = [...formDataFields];
+      u[i] = { ...u[i], file, value: '' };
+      setFormDataFields(u);
+    } catch (e) { alert('Failed to read file: ' + e.message); }
+  };
+  const setBinaryFromFile = async (fileObj) => {
+    if (!fileObj) { setBinaryFile(null); return; }
+    if (fileObj.size > MAX_UPLOAD_BYTES) { alert('File exceeds 5 MB limit'); return; }
+    try { setBinaryFile(await readFileAsBase64(fileObj)); }
+    catch (e) { alert('Failed to read file: ' + e.message); }
+  };
+  const removeFormDataField = (i) => setFormDataFields(formDataFields.filter((_, idx) => idx !== i));
+  const updateFormDataField = (i, f, v) => { const u = [...formDataFields]; u[i] = { ...u[i], [f]: v }; setFormDataFields(u); };
+
+  const addUrlEncodedField = () => setUrlEncodedFields([...urlEncodedFields, { key: '', value: '', enabled: true }]);
+  const removeUrlEncodedField = (i) => setUrlEncodedFields(urlEncodedFields.filter((_, idx) => idx !== i));
+  const updateUrlEncodedField = (i, f, v) => { const u = [...urlEncodedFields]; u[i] = { ...u[i], [f]: v }; setUrlEncodedFields(u); };
+
   const buildHeaders = () => {
     const h = {};
     headers.filter((hd) => hd.enabled && hd.key).forEach((hd) => { h[hd.key] = hd.value; });
@@ -305,9 +383,42 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
     if (!testName.trim() || !apiUrl.trim()) { alert('Name and URL are required'); return; }
     setSaving(true);
     try {
-      let parsedBody;
-      if (apiBody.trim()) {
-        try { parsedBody = JSON.parse(apiBody); } catch { throw new Error('Invalid JSON body'); }
+      const bodyConfig = {};
+      const noBody = ['GET', 'HEAD'].includes(apiMethod) || bodyType === 'none';
+      if (!noBody) {
+        if (bodyType === 'json') {
+          if (apiBody.trim()) {
+            try { bodyConfig.body = JSON.parse(apiBody); } catch { throw new Error('Invalid JSON body'); }
+          }
+          bodyConfig.bodyType = 'json';
+        } else if (bodyType === 'raw') {
+          bodyConfig.bodyType = 'raw';
+          bodyConfig.body = rawBody;
+          bodyConfig.rawLanguage = rawLang;
+        } else if (bodyType === 'form-data') {
+          bodyConfig.bodyType = 'form-data';
+          bodyConfig.formData = formDataFields
+            .filter((f) => f.enabled && f.key)
+            .map((f) => f.type === 'file'
+              ? { key: f.key, type: 'file', enabled: true, file: f.file }
+              : { key: f.key, type: 'text', enabled: true, value: f.value });
+        } else if (bodyType === 'binary') {
+          if (!binaryFile) throw new Error('Select a file for binary body');
+          bodyConfig.bodyType = 'binary';
+          bodyConfig.binary = binaryFile;
+        } else if (bodyType === 'urlencoded') {
+          bodyConfig.bodyType = 'urlencoded';
+          bodyConfig.urlEncoded = urlEncodedFields.filter((f) => f.enabled && f.key);
+        } else if (bodyType === 'graphql') {
+          let vars = {};
+          if (graphqlVars.trim()) {
+            try { vars = JSON.parse(graphqlVars); } catch { throw new Error('GraphQL variables must be valid JSON'); }
+          }
+          bodyConfig.bodyType = 'graphql';
+          bodyConfig.graphql = { query: graphqlQuery, variables: vars };
+        }
+      } else {
+        bodyConfig.bodyType = 'none';
       }
       const validExtractors = extractors.filter((e) => e.name && e.path);
       const buildAuth = () => {
@@ -330,7 +441,7 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
           method: apiMethod,
           url: buildUrl(),
           headers: buildHeaders(),
-          body: parsedBody,
+          ...bodyConfig,
           timeout: 10000,
           assertions: assertions.map((a) => ({
             target: a.target,
@@ -359,7 +470,7 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
 
         <div className="flex-1 overflow-auto p-5 space-y-4">
           <div className="card p-4">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-600 text-white w-fit mb-3"><Globe size={16} /> API Test (JSON only)</div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-600 text-white w-fit mb-3"><Globe size={16} /> API Test</div>
             <input value={testName} onChange={(e) => setTestName(e.target.value)} className="input" placeholder="Test name" autoFocus />
           </div>
 
@@ -446,14 +557,157 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
             )}
 
             {activeTab === 'body' && (
-              ['GET', 'DELETE'].includes(apiMethod)
+              ['GET', 'HEAD'].includes(apiMethod)
                 ? <p className="text-xs text-surface-400 text-center py-6">{apiMethod} requests don&apos;t have a body</p>
                 : <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs text-surface-500">JSON Body</label>
-                      <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-medium">JSON only</span>
+                    <div className="flex flex-wrap items-center gap-4 mb-3 text-xs">
+                      {[
+                        { id: 'none', label: 'none' },
+                        { id: 'form-data', label: 'form-data' },
+                        { id: 'urlencoded', label: 'x-www-form-urlencoded' },
+                        { id: 'raw', label: 'raw' },
+                        { id: 'json', label: 'JSON' },
+                        { id: 'binary', label: 'binary' },
+                        { id: 'graphql', label: 'GraphQL' },
+                      ].map((opt) => (
+                        <label key={opt.id} className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="bodyType"
+                            checked={bodyType === opt.id}
+                            onChange={() => setBodyType(opt.id)}
+                            className="text-brand-600"
+                          />
+                          <span className={bodyType === opt.id ? 'text-brand-600 font-medium' : 'text-surface-500'}>{opt.label}</span>
+                        </label>
+                      ))}
                     </div>
-                    <textarea value={apiBody} onChange={(e) => setApiBody(e.target.value)} className="input font-mono text-sm resize-none" rows={6} placeholder={'{\n  "key": "{{env:SOME_VAR}}",\n  "id": "{{response.prev.id}}"\n}'} />
+
+                    {bodyType === 'none' && (
+                      <p className="text-xs text-surface-400 text-center py-6">This request does not have a body</p>
+                    )}
+
+                    {bodyType === 'json' && (
+                      <div>
+                        <label className="text-xs text-surface-500 mb-1 block">JSON Body</label>
+                        <textarea value={apiBody} onChange={(e) => setApiBody(e.target.value)} className="input font-mono text-sm resize-none" rows={6} placeholder={'{\n  "key": "{{env:SOME_VAR}}",\n  "id": "{{response.prev.id}}"\n}'} />
+                      </div>
+                    )}
+
+                    {bodyType === 'raw' && (
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs text-surface-500">Raw Body</label>
+                          <select value={rawLang} onChange={(e) => setRawLang(e.target.value)} className="input py-1 text-xs w-32">
+                            <option value="text">Text</option>
+                            <option value="json">JSON</option>
+                            <option value="xml">XML</option>
+                            <option value="html">HTML</option>
+                            <option value="javascript">JavaScript</option>
+                          </select>
+                        </div>
+                        <textarea value={rawBody} onChange={(e) => setRawBody(e.target.value)} className="input font-mono text-sm resize-none" rows={6} placeholder="Raw request body" />
+                      </div>
+                    )}
+
+                    {bodyType === 'form-data' && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-surface-500">Form Data Fields</span>
+                          <button onClick={addFormDataField} className="btn-ghost text-xs"><Plus size={12} /> Add</button>
+                        </div>
+                        {formDataFields.length === 0 ? <p className="text-xs text-surface-400 text-center py-4">No fields</p> : (
+                          <div className="space-y-2">{formDataFields.map((f, i) => (
+                            <div key={i} className="flex gap-2 items-center">
+                              <input type="checkbox" checked={f.enabled} onChange={(e) => updateFormDataField(i, 'enabled', e.target.checked)} className="rounded border-surface-300 text-brand-600" />
+                              <input value={f.key} onChange={(e) => updateFormDataField(i, 'key', e.target.value)} className="input py-1.5 text-sm flex-1 font-mono" placeholder="Key (e.g. user[user_name])" />
+                              <select
+                                value={f.type || 'text'}
+                                onChange={(e) => {
+                                  const u = [...formDataFields];
+                                  u[i] = { ...u[i], type: e.target.value, value: '', file: null };
+                                  setFormDataFields(u);
+                                }}
+                                className="input py-1.5 text-xs w-20"
+                              >
+                                <option value="text">Text</option>
+                                <option value="file">File</option>
+                              </select>
+                              {f.type === 'file' ? (
+                                <div className="flex-1 flex items-center gap-2 min-w-0">
+                                  <label className="btn-secondary text-xs cursor-pointer shrink-0">
+                                    Choose…
+                                    <input type="file" className="hidden" onChange={(e) => setFormDataFieldFile(i, e.target.files?.[0] || null)} />
+                                  </label>
+                                  <span className="text-xs text-surface-500 truncate">
+                                    {f.file ? `${f.file.filename} (${(f.file.size / 1024).toFixed(1)} KB)` : 'No file selected'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <input value={f.value} onChange={(e) => updateFormDataField(i, 'value', e.target.value)} className="input py-1.5 text-sm flex-1 font-mono" placeholder="Value" />
+                              )}
+                              <button onClick={() => removeFormDataField(i)} className="p-1 text-surface-300 hover:text-red-500"><Trash2 size={14} /></button>
+                            </div>
+                          ))}</div>
+                        )}
+                        <p className="text-[11px] text-surface-400 mt-2">Sent as <code className="bg-surface-100 px-1 rounded">multipart/form-data</code>. Files capped at 5 MB (stored inline with the test).</p>
+                      </div>
+                    )}
+
+                    {bodyType === 'urlencoded' && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-surface-500">URL-encoded Fields</span>
+                          <button onClick={addUrlEncodedField} className="btn-ghost text-xs"><Plus size={12} /> Add</button>
+                        </div>
+                        {urlEncodedFields.length === 0 ? <p className="text-xs text-surface-400 text-center py-4">No fields</p> : (
+                          <div className="space-y-2">{urlEncodedFields.map((f, i) => (
+                            <div key={i} className="flex gap-2 items-center">
+                              <input type="checkbox" checked={f.enabled} onChange={(e) => updateUrlEncodedField(i, 'enabled', e.target.checked)} className="rounded border-surface-300 text-brand-600" />
+                              <input value={f.key} onChange={(e) => updateUrlEncodedField(i, 'key', e.target.value)} className="input py-1.5 text-sm flex-1 font-mono" placeholder="Key" />
+                              <input value={f.value} onChange={(e) => updateUrlEncodedField(i, 'value', e.target.value)} className="input py-1.5 text-sm flex-1 font-mono" placeholder="Value" />
+                              <button onClick={() => removeUrlEncodedField(i)} className="p-1 text-surface-300 hover:text-red-500"><Trash2 size={14} /></button>
+                            </div>
+                          ))}</div>
+                        )}
+                        <p className="text-[11px] text-surface-400 mt-2">Sent as <code className="bg-surface-100 px-1 rounded">application/x-www-form-urlencoded</code>.</p>
+                      </div>
+                    )}
+
+                    {bodyType === 'binary' && (
+                      <div>
+                        <label className="text-xs text-surface-500 mb-1 block">Binary File</label>
+                        <div className="flex items-center gap-2">
+                          <label className="btn-secondary text-xs cursor-pointer">
+                            Choose file…
+                            <input type="file" className="hidden" onChange={(e) => setBinaryFromFile(e.target.files?.[0] || null)} />
+                          </label>
+                          {binaryFile ? (
+                            <>
+                              <span className="text-xs text-surface-600 font-mono truncate">{binaryFile.filename}</span>
+                              <span className="text-xs text-surface-400">{(binaryFile.size / 1024).toFixed(1)} KB · {binaryFile.mimeType}</span>
+                              <button onClick={() => setBinaryFile(null)} className="text-xs text-red-500 hover:underline">Clear</button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-surface-400">No file selected</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-surface-400 mt-2">Raw file body. Content-Type defaults to the file's MIME type. Capped at 5 MB.</p>
+                      </div>
+                    )}
+
+                    {bodyType === 'graphql' && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs text-surface-500 mb-1 block">Query</label>
+                          <textarea value={graphqlQuery} onChange={(e) => setGraphqlQuery(e.target.value)} className="input font-mono text-sm resize-none" rows={6} placeholder={'query GetUser($id: ID!) {\n  user(id: $id) { id name }\n}'} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-surface-500 mb-1 block">Variables (JSON)</label>
+                          <textarea value={graphqlVars} onChange={(e) => setGraphqlVars(e.target.value)} className="input font-mono text-sm resize-none" rows={4} placeholder={'{\n  "id": "123"\n}'} />
+                        </div>
+                      </div>
+                    )}
                   </div>
             )}
 
