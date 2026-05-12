@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import {
   ExternalLink, Link2, Trash2, Plus, Loader2, CheckCircle, XCircle,
-  RefreshCw, AlertTriangle, Search, X, RotateCcw,
+  RefreshCw, AlertTriangle, Search, X, RotateCcw, Settings, Save, Lock,
 } from 'lucide-react';
 
 function JiraLogo() {
@@ -12,6 +13,87 @@ function JiraLogo() {
       <path d="M11.53 2.03a.75.75 0 0 0-1.06 0L2.03 10.47a.75.75 0 0 0 0 1.06l9.47 9.47a.75.75 0 0 0 1.06 0l1.44-1.44-8.5-8.5 8.03-8.03-1.97-1.97-.03-.03Z" fill="#2684FF"/>
       <path d="M12.47 2.03a.75.75 0 0 1 1.06 0l8.44 8.44a.75.75 0 0 1 0 1.06l-9.47 9.47a.75.75 0 0 1-1.06 0l-1.44-1.44 8.5-8.5-8.03-8.03 1.97-1.97.03-.03Z" fill="#0052CC"/>
     </svg>
+  );
+}
+
+// Admin form for setting per-organisation OAuth client credentials.
+// Lives inline on JiraPage so admins can configure without leaving the flow.
+function OAuthSetupCard({ initial, onSaved }) {
+  const [clientId, setClientId] = useState(initial?.clientId || '');
+  const [clientSecret, setClientSecret] = useState('');
+  const [redirectUri, setRedirectUri] = useState(
+    initial?.redirectUri || `${window.location.origin.replace(/:\d+$/, '')}/api/jira/callback`
+  );
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const handleSave = async () => {
+    setErr(null);
+    if (!clientId.trim() || !clientSecret.trim() || !redirectUri.trim()) {
+      setErr('All three fields are required.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await api.request('PUT', '/jira/oauth-config', { clientId, clientSecret, redirectUri });
+      onSaved(result);
+    } catch (e) {
+      setErr(e.message || 'Save failed');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="card p-6 max-w-2xl mx-auto mt-8">
+      <div className="flex items-center gap-2 mb-1">
+        <Lock size={16} className="text-surface-500" />
+        <h3 className="font-semibold">Jira OAuth Setup (Admin)</h3>
+      </div>
+      <p className="text-sm text-surface-500 mb-5">
+        Register an Atlassian OAuth 2.0 (3LO) app at{' '}
+        <a href="https://developer.atlassian.com/console/myapps/" target="_blank" rel="noopener noreferrer"
+           className="text-brand-600 hover:underline inline-flex items-center gap-1">
+          developer.atlassian.com <ExternalLink size={11} />
+        </a>{' '}
+        and paste its credentials here. Required scopes: <code className="text-xs bg-surface-100 px-1 rounded">read:jira-work</code>,{' '}
+        <code className="text-xs bg-surface-100 px-1 rounded">write:jira-work</code>,{' '}
+        <code className="text-xs bg-surface-100 px-1 rounded">read:jira-user</code>,{' '}
+        <code className="text-xs bg-surface-100 px-1 rounded">offline_access</code>.
+      </p>
+
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-medium text-surface-600 mb-1 block">Client ID</label>
+          <input value={clientId} onChange={(e) => setClientId(e.target.value)}
+                 className="input font-mono text-sm" placeholder="abcdef0123456789ABCDEF" />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-surface-600 mb-1 block">
+            Client Secret {initial?.hasSecret && <span className="text-surface-400">(stored — paste again to replace)</span>}
+          </label>
+          <input value={clientSecret} onChange={(e) => setClientSecret(e.target.value)}
+                 type="password" autoComplete="off"
+                 className="input font-mono text-sm" placeholder="••••••••" />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-surface-600 mb-1 block">Callback URL</label>
+          <input value={redirectUri} onChange={(e) => setRedirectUri(e.target.value)}
+                 className="input font-mono text-sm" placeholder="https://your-app.com/api/jira/callback" />
+          <p className="text-xs text-surface-400 mt-1">Must match exactly what's registered in the Atlassian developer console.</p>
+        </div>
+      </div>
+
+      {err && (
+        <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-start gap-2">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" /> {err}
+        </div>
+      )}
+
+      <div className="mt-5 flex gap-2 justify-end">
+        <button onClick={handleSave} disabled={saving} className="btn-primary">
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save credentials
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -215,27 +297,44 @@ function AddLinkModal({ onAdd, onClose }) {
 
 export default function JiraPage() {
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'owner';
   const [status, setStatus] = useState(null);
+  const [oauthConfig, setOauthConfig] = useState(null);
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddLink, setShowAddLink] = useState(false);
+  const [showOAuthSettings, setShowOAuthSettings] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
   const justConnected = searchParams.get('connected') === '1';
 
   const load = async () => {
     try {
-      const [statusData, linksData] = await Promise.all([
+      const [statusData, linksData, oauthData] = await Promise.all([
         api.request('GET', '/jira/status'),
-        api.request('GET', '/jira/links'),
+        api.request('GET', '/jira/links').catch(() => ({ data: [] })),
+        api.request('GET', '/jira/oauth-config').catch(() => ({ configured: false, source: 'none' })),
       ]);
       setStatus(statusData);
       setLinks(linksData.data || []);
+      setOauthConfig(oauthData);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
+
+  const handleOAuthSaved = (result) => {
+    setOauthConfig(result);
+    setShowOAuthSettings(false);
+  };
+
+  const handleClearOAuth = async () => {
+    if (!confirm('Clear org-wide Jira OAuth credentials? Users with active integrations will be unable to refresh their tokens until new credentials are set.')) return;
+    await api.request('DELETE', '/jira/oauth-config');
+    setOauthConfig({ configured: false, source: 'none' });
+  };
 
   const handleDisconnect = async () => {
     if (!confirm('Disconnect Jira? All links will remain but syncing will stop.')) return;
@@ -264,14 +363,50 @@ export default function JiraPage() {
 
   if (loading) return <div className="flex justify-center py-32"><Loader2 size={28} className="animate-spin text-brand-600" /></div>;
 
+  // Pre-connect state: either the org has no OAuth credentials yet (show the
+  // admin setup card or a "ask admin" notice) or it does (show Connect).
   if (!status?.connected) {
+    const configured = !!oauthConfig?.configured;
     return (
       <div className="page">
         <h1 className="text-2xl font-semibold flex items-center gap-3 mb-2">
           <JiraLogo /> Jira Integration
         </h1>
         <p className="text-surface-500 text-sm mb-8">Connect Atlassian Jira to link test results with issues.</p>
-        <ConnectPanel />
+
+        {!configured && isAdmin && (
+          <OAuthSetupCard initial={oauthConfig} onSaved={handleOAuthSaved} />
+        )}
+
+        {!configured && !isAdmin && (
+          <div className="card p-8 text-center max-w-md mx-auto mt-16">
+            <Lock size={32} className="mx-auto text-surface-300 mb-3" />
+            <h2 className="text-lg font-semibold mb-2">Jira OAuth not configured</h2>
+            <p className="text-surface-500 text-sm">
+              Your organisation's admin needs to set the Jira OAuth credentials before you can connect your account.
+            </p>
+          </div>
+        )}
+
+        {configured && (
+          <>
+            <ConnectPanel />
+            {isAdmin && (
+              <div className="max-w-md mx-auto mt-4 flex items-center justify-center gap-3 text-xs text-surface-400">
+                <span>OAuth source: <code className="bg-surface-100 px-1 rounded">{oauthConfig.source}</code></span>
+                <button onClick={() => setShowOAuthSettings(true)} className="hover:text-surface-700 inline-flex items-center gap-1">
+                  <Settings size={11} /> Edit credentials
+                </button>
+                {oauthConfig.source === 'db' && (
+                  <button onClick={handleClearOAuth} className="hover:text-red-600">Clear</button>
+                )}
+              </div>
+            )}
+            {showOAuthSettings && isAdmin && (
+              <OAuthSetupCard initial={oauthConfig} onSaved={handleOAuthSaved} />
+            )}
+          </>
+        )}
       </div>
     );
   }
