@@ -4,7 +4,7 @@ import { api } from '../services/api';
 import {
   ArrowLeft, Plus, Loader2, Trash2, Play, CheckCircle, XCircle, Clock, Globe,
   Monitor, ChevronDown, ChevronUp, Copy, Check, Edit2, X, Lock, Share2,
-  Link2, Zap, AlertCircle, Pencil,
+  Link2, Zap, AlertCircle, Pencil, Cookie as CookieIcon,
 } from 'lucide-react';
 
 const API_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
@@ -333,7 +333,7 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
   const removeAssertion = (i) => { if (assertions.length > 1) setAssertions(assertions.filter((_, idx) => idx !== i)); };
   const updateAssertion = (i, f, v) => { const u = [...assertions]; u[i] = { ...u[i], [f]: v }; setAssertions(u); };
 
-  const addExtractor = () => setExtractors([...extractors, { name: '', path: '' }]);
+  const addExtractor = () => setExtractors([...extractors, { name: '', source: 'body', path: '' }]);
   const removeExtractor = (i) => setExtractors(extractors.filter((_, idx) => idx !== i));
   const updateExtractor = (i, f, v) => { const u = [...extractors]; u[i] = { ...u[i], [f]: v }; setExtractors(u); };
 
@@ -421,7 +421,9 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
       } else {
         bodyConfig.bodyType = 'none';
       }
-      const validExtractors = extractors.filter((e) => e.name && e.path);
+      const validExtractors = extractors
+        .filter((e) => e.name && e.path)
+        .map((e) => ({ name: e.name, source: e.source || 'body', path: e.path }));
       const buildAuth = () => {
         if (authType === 'none') return undefined;
         if (authType === 'bearer') return { type: 'bearer', token: bearerToken };
@@ -717,7 +719,7 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <span className="text-xs font-medium text-surface-700">Response Extractors</span>
-                    <p className="text-xs text-surface-400 mt-0.5">Extract values from this response for use as <code className="bg-surface-100 px-1 rounded">{'{{response.prev.NAME}}'}</code> in the next test</p>
+                    <p className="text-xs text-surface-400 mt-0.5">Extract values from response body / headers / cookies for use as <code className="bg-surface-100 px-1 rounded">{'{{response.prev.NAME}}'}</code> in the next test</p>
                   </div>
                   <button onClick={addExtractor} className="btn-ghost text-xs"><Plus size={12} /> Add</button>
                 </div>
@@ -725,19 +727,32 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
                   <div className="text-center py-6 bg-surface-50 rounded-lg">
                     <Link2 size={20} className="mx-auto text-surface-300 mb-2" />
                     <p className="text-xs text-surface-400">No extractors — add one to chain this response into the next test</p>
-                    <p className="text-xs text-surface-300 mt-1">Example: name=<code>userId</code>, path=<code>data.id</code> → use as <code>{'{{response.prev.userId}}'}</code></p>
+                    <p className="text-xs text-surface-300 mt-1">Examples: body <code>data.id</code>, cookie <code>sessionId</code>, header <code>x-csrf-token</code></p>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {extractors.map((e, i) => (
+                    {extractors.map((e, i) => {
+                      const src = e.source || 'body';
+                      const pathPlaceholder = src === 'body'
+                        ? 'JSON path (e.g. data.id)'
+                        : src === 'cookie'
+                          ? 'Cookie name (e.g. sessionId)'
+                          : 'Header name (e.g. x-csrf-token)';
+                      return (
                       <div key={i} className="flex gap-2 items-center bg-purple-50/50 rounded-lg p-2">
-                        <div className="flex-1 grid grid-cols-2 gap-2">
-                          <input value={e.name} onChange={(ev) => updateExtractor(i, 'name', ev.target.value)} className="input py-1.5 text-sm font-mono" placeholder="Variable name (e.g. userId)" />
-                          <input value={e.path} onChange={(ev) => updateExtractor(i, 'path', ev.target.value)} className="input py-1.5 text-sm font-mono" placeholder="JSON path (e.g. data.id)" />
+                        <div className="flex-1 grid grid-cols-3 gap-2">
+                          <input value={e.name} onChange={(ev) => updateExtractor(i, 'name', ev.target.value)} className="input py-1.5 text-sm font-mono" placeholder="Variable name" />
+                          <select value={src} onChange={(ev) => updateExtractor(i, 'source', ev.target.value)} className="input py-1.5 text-sm">
+                            <option value="body">body</option>
+                            <option value="header">header</option>
+                            <option value="cookie">cookie</option>
+                          </select>
+                          <input value={e.path} onChange={(ev) => updateExtractor(i, 'path', ev.target.value)} className="input py-1.5 text-sm font-mono" placeholder={pathPlaceholder} />
                         </div>
                         <button onClick={() => removeExtractor(i)} className="p-1.5 text-surface-300 hover:text-red-500"><Trash2 size={14} /></button>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -964,7 +979,29 @@ export default function CollectionDetailPage() {
             </div>
           )}
           {collection.description && <p className="text-surface-500 text-sm mt-1">{collection.description}</p>}
-          <p className="text-xs text-surface-400 mt-1">{tests.length} test{tests.length !== 1 ? 's' : ''}</p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-xs text-surface-400">{tests.length} test{tests.length !== 1 ? 's' : ''}</p>
+            <label className="flex items-center gap-1.5 text-xs text-surface-500 cursor-pointer select-none" title="When ON, the runner maintains a per-run cookie jar (Set-Cookie auto-attaches to subsequent requests). Forces serial execution for correctness.">
+              <input
+                type="checkbox"
+                checked={!!collection.autoCookieJar}
+                onChange={async (e) => {
+                  const next = e.target.checked;
+                  const prev = collection.autoCookieJar;
+                  setCollection({ ...collection, autoCookieJar: next });
+                  try {
+                    await api.request('PATCH', '/collections/' + collectionId, { autoCookieJar: next });
+                  } catch (err) {
+                    setCollection({ ...collection, autoCookieJar: prev });
+                    alert('Failed to update cookie jar setting: ' + (err.message || err));
+                  }
+                }}
+                className="h-3.5 w-3.5 rounded accent-brand-500"
+              />
+              <CookieIcon size={12} />
+              <span>Auto cookie jar {collection.autoCookieJar ? '(on — serial run)' : '(off)'}</span>
+            </label>
+          </div>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowShare(true)} className="btn-secondary"><Share2 size={16} /> Share</button>

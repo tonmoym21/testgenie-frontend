@@ -10,6 +10,9 @@ export default function ResponseViewer({ result }) {
   const raw = result.rawResponse || {};
   const logs = result.logs || [];
   const assertions = result.assertionResults || [];
+  const cookies = raw.cookies || {};
+  const chainCookies = result.chainCookies || null;
+  const cookieCount = Object.keys(cookies).length + (chainCookies ? chainCookies.length : 0);
 
   const handleCopy = (text) => {
     navigator.clipboard.writeText(typeof text === 'string' ? text : JSON.stringify(text, null, 2));
@@ -20,6 +23,7 @@ export default function ResponseViewer({ result }) {
   const tabs = [
     { id: 'body', label: 'Body' },
     { id: 'headers', label: 'Headers', count: raw.headers ? Object.keys(raw.headers).length : 0 },
+    { id: 'cookies', label: 'Cookies', count: cookieCount },
     { id: 'assertions', label: 'Tests', count: assertions.length },
     { id: 'logs', label: 'Logs', count: logs.filter((l) => l.level !== 'debug').length },
   ];
@@ -104,6 +108,76 @@ export default function ResponseViewer({ result }) {
                 </div>
               ) : (
                 <p className="text-sm text-surface-400 text-center py-8">No headers captured</p>
+              )}
+            </div>
+          )}
+
+          {/* Cookies Tab */}
+          {activeTab === 'cookies' && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-surface-400 mb-1">Set on this response</p>
+                {Object.keys(cookies).length > 0 ? (
+                  <div className="bg-surface-50 rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-surface-200">
+                          <th className="text-left px-3 py-2 font-medium text-surface-400 uppercase w-1/3">Name</th>
+                          <th className="text-left px-3 py-2 font-medium text-surface-400 uppercase">Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(cookies).map(([name, value]) => (
+                          <tr key={name} className="border-b border-surface-100 last:border-0 hover:bg-surface-100/50">
+                            <td className="px-3 py-2 font-mono font-medium text-surface-700">{name}</td>
+                            <td className="px-3 py-2 font-mono text-surface-500 break-all">{value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-surface-400 py-3">No Set-Cookie headers on this response</p>
+                )}
+              </div>
+              {chainCookies && (
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-surface-400 mb-1">Chain jar after this step ({chainCookies.length})</p>
+                  {chainCookies.length > 0 ? (
+                    <div className="bg-purple-50/40 rounded-lg overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-purple-200">
+                            <th className="text-left px-3 py-2 font-medium text-surface-400 uppercase">Name</th>
+                            <th className="text-left px-3 py-2 font-medium text-surface-400 uppercase">Value</th>
+                            <th className="text-left px-3 py-2 font-medium text-surface-400 uppercase">Domain</th>
+                            <th className="text-left px-3 py-2 font-medium text-surface-400 uppercase">Path</th>
+                            <th className="text-left px-3 py-2 font-medium text-surface-400 uppercase">Expires</th>
+                            <th className="text-left px-3 py-2 font-medium text-surface-400 uppercase">Flags</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {chainCookies.map((c, i) => (
+                            <tr key={i} className="border-b border-purple-100 last:border-0">
+                              <td className="px-3 py-2 font-mono font-medium text-surface-700">{c.name}</td>
+                              <td className="px-3 py-2 font-mono text-surface-500 break-all max-w-xs truncate" title={c.value}>{c.value}</td>
+                              <td className="px-3 py-2 font-mono text-surface-500">{c.domain || '—'}</td>
+                              <td className="px-3 py-2 font-mono text-surface-500">{c.path || '/'}</td>
+                              <td className="px-3 py-2 text-surface-500">{c.expires ? new Date(c.expires).toLocaleString() : 'session'}</td>
+                              <td className="px-3 py-2 text-surface-500 space-x-1">
+                                {c.secure && <span className="bg-blue-100 text-blue-700 px-1 rounded text-[10px]">Secure</span>}
+                                {c.httpOnly && <span className="bg-gray-100 text-gray-700 px-1 rounded text-[10px]">HttpOnly</span>}
+                                {c.sameSite && <span className="bg-amber-100 text-amber-700 px-1 rounded text-[10px]">{c.sameSite}</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-surface-400 py-3">Jar is empty</p>
+                  )}
+                </div>
               )}
             </div>
           )}
