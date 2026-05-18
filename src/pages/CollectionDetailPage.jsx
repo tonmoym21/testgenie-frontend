@@ -422,8 +422,14 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
         bodyConfig.bodyType = 'none';
       }
       const validExtractors = extractors
-        .filter((e) => e.name && e.path)
-        .map((e) => ({ name: e.name, source: e.source || 'body', path: e.path }));
+        .filter((e) => {
+          if (!e.path) return false;
+          // body-cookies doesn't bind a single variable name — its job is to
+          // shove every entry under `path` into the chain cookie jar.
+          if ((e.source || 'body') === 'body-cookies') return true;
+          return !!e.name;
+        })
+        .map((e) => ({ name: e.name || '', source: e.source || 'body', path: e.path }));
       const buildAuth = () => {
         if (authType === 'none') return undefined;
         if (authType === 'bearer') return { type: 'bearer', token: bearerToken };
@@ -737,19 +743,36 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
                         ? 'JSON path (e.g. data.id)'
                         : src === 'cookie'
                           ? 'Cookie name (e.g. sessionId)'
-                          : 'Header name (e.g. x-csrf-token)';
+                          : src === 'body-cookies'
+                            ? 'Path to cookie object (e.g. cookie)'
+                            : 'Header name (e.g. x-csrf-token)';
+                      const isBodyCookies = src === 'body-cookies';
                       return (
-                      <div key={i} className="flex gap-2 items-center bg-purple-50/50 rounded-lg p-2">
-                        <div className="flex-1 grid grid-cols-3 gap-2">
-                          <input value={e.name} onChange={(ev) => updateExtractor(i, 'name', ev.target.value)} className="input py-1.5 text-sm font-mono" placeholder="Variable name" />
-                          <select value={src} onChange={(ev) => updateExtractor(i, 'source', ev.target.value)} className="input py-1.5 text-sm">
-                            <option value="body">body</option>
-                            <option value="header">header</option>
-                            <option value="cookie">cookie</option>
-                          </select>
-                          <input value={e.path} onChange={(ev) => updateExtractor(i, 'path', ev.target.value)} className="input py-1.5 text-sm font-mono" placeholder={pathPlaceholder} />
+                      <div key={i} className="bg-purple-50/50 rounded-lg p-2">
+                        <div className="flex gap-2 items-center">
+                          <div className="flex-1 grid grid-cols-3 gap-2">
+                            <input
+                              value={e.name}
+                              onChange={(ev) => updateExtractor(i, 'name', ev.target.value)}
+                              className="input py-1.5 text-sm font-mono disabled:bg-surface-50 disabled:text-surface-300"
+                              placeholder={isBodyCookies ? '(not used)' : 'Variable name'}
+                              disabled={isBodyCookies}
+                            />
+                            <select value={src} onChange={(ev) => updateExtractor(i, 'source', ev.target.value)} className="input py-1.5 text-sm">
+                              <option value="body">body</option>
+                              <option value="header">header</option>
+                              <option value="cookie">cookie</option>
+                              <option value="body-cookies">body-cookies</option>
+                            </select>
+                            <input value={e.path} onChange={(ev) => updateExtractor(i, 'path', ev.target.value)} className="input py-1.5 text-sm font-mono" placeholder={pathPlaceholder} />
+                          </div>
+                          <button onClick={() => removeExtractor(i)} className="p-1.5 text-surface-300 hover:text-red-500"><Trash2 size={14} /></button>
                         </div>
-                        <button onClick={() => removeExtractor(i)} className="p-1.5 text-surface-300 hover:text-red-500"><Trash2 size={14} /></button>
+                        {isBodyCookies && (
+                          <p className="text-[11px] text-purple-700/70 mt-1 pl-1">
+                            Ingests every key/value under that body path into the chain cookie jar (turn on Auto cookie jar on the collection). Use for APIs that return cookies as JSON instead of <code>Set-Cookie</code>.
+                          </p>
+                        )}
                       </div>
                       );
                     })}
