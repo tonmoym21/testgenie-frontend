@@ -4,7 +4,8 @@ import { api } from '../services/api';
 import {
   ArrowLeft, Plus, Loader2, Trash2, Play, CheckCircle, XCircle, Clock, Globe,
   Monitor, ChevronDown, ChevronUp, Copy, Check, Edit2, X, Lock, Share2,
-  Link2, Zap, AlertCircle, Pencil, Cookie as CookieIcon,
+  Link2, Zap, AlertCircle, Pencil, Cookie as CookieIcon, ArrowUp, ArrowDown,
+  RotateCcw,
 } from 'lucide-react';
 
 const API_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
@@ -845,13 +846,20 @@ export default function CollectionDetailPage() {
   const [runDone, setRunDone] = useState(false);
   const [runReportId, setRunReportId] = useState(null);
   const [runningOne, setRunningOne] = useState(null); // testId being run individually
+  // Per-collection chain session state (cookies + chainVars persisted across
+  // individual ▶️ clicks). Mirrors what the backend GET /:colId/session returns.
+  const [chainSession, setChainSession] = useState({ active: false });
   const eventSourceRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
-      const data = await api.request('GET', '/collections/' + collectionId);
+      const [data, sessionData] = await Promise.all([
+        api.request('GET', '/collections/' + collectionId),
+        api.request('GET', `/collections/${collectionId}/session`).catch(() => ({ active: false })),
+      ]);
       setCollection(data);
       setTests(data.tests || []);
+      setChainSession(sessionData);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, [collectionId]);
@@ -889,6 +897,30 @@ export default function CollectionDetailPage() {
     setTests((prev) => prev.filter((t) => t.id !== testId));
   };
 
+  // Reorder by swapping adjacent tests' sortOrder. Optimistic UI; on PATCH
+  // failure we reload to drop back to server state.
+  const handleMoveTest = async (testIndex, direction) => {
+    const target = testIndex + direction;
+    if (target < 0 || target >= tests.length) return;
+    const a = tests[testIndex];
+    const b = tests[target];
+    // Optimistic local swap
+    const reordered = [...tests];
+    reordered[testIndex] = b;
+    reordered[target] = a;
+    setTests(reordered);
+    try {
+      // Distinct sort_order values per test; using index*10 leaves room for
+      // future bulk-reorder UX without churn.
+      await Promise.all(reordered.map((t, idx) =>
+        api.request('PATCH', `/collections/${collectionId}/tests/${t.id}`, { sortOrder: idx * 10 })
+      ));
+    } catch (err) {
+      console.error('Reorder failed', err);
+      load();
+    }
+  };
+
   // Run a single test in the collection
   const handleRunOne = async (testId) => {
     if (runningOne || running) return;
@@ -897,6 +929,9 @@ export default function CollectionDetailPage() {
     try {
       const r = await api.request('POST', `/collections/${collectionId}/tests/${testId}/run`, {});
       setRunResults((prev) => ({ ...prev, [testId]: r }));
+      // Backend ships the refreshed chain session on every single-test run
+      // so the badge stays current without an extra round-trip.
+      if (r.session) setChainSession(r.session);
     } catch (err) {
       setRunResults((prev) => ({
         ...prev,
@@ -1035,6 +1070,27 @@ export default function CollectionDetailPage() {
               <CookieIcon size={12} />
               <span>Auto cookie jar {collection.autoCookieJar ? '(on — serial run)' : '(off)'}</span>
             </label>
+            {chainSession?.active && (
+              <div
+                className="flex items-center gap-1.5 text-xs text-purple-700 bg-purple-50 border border-purple-100 rounded-md px-2 py-0.5"
+                title={`Cookies + chain vars from previous individual runs are persisted for 1h idle so single ▶️ clicks chain together.\nLast updated ${new Date(chainSession.updatedAt).toLocaleTimeString()}.`}
+              >
+                <Link2 size={11} />
+                <span>Chain session: {chainSession.cookieCount} cookie{chainSession.cookieCount === 1 ? '' : 's'}, {chainSession.chainVarCount} var{chainSession.chainVarCount === 1 ? '' : 's'}</span>
+                <button
+                  onClick={async () => {
+                    try {
+                      await api.request('DELETE', `/collections/${collectionId}/session`);
+                      setChainSession({ active: false });
+                    } catch (err) { console.error('Reset session failed', err); }
+                  }}
+                  className="ml-1 inline-flex items-center gap-0.5 text-purple-600 hover:text-purple-900 underline decoration-dotted"
+                  title="Clear cookies + chain vars so the next individual run starts cold"
+                >
+                  <RotateCcw size={10} /> Reset
+                </button>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
@@ -1092,7 +1148,21 @@ export default function CollectionDetailPage() {
               <div key={test.id} className="card overflow-hidden">
                 <div className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <span className="text-xs text-surface-400 font-mono w-6 shrink-0">{i + 1}.</span>
+                    <div className="flex flex-col items-center w-6 shrink-0">
+                      <button
+                        onClick={() => handleMoveTest(i, -1)}
+                        disabled={i === 0 || running}
+                        title="Move up"
+                        className="text-surface-300 hover:text-purple-600 disabled:opacity-30 disabled:hover:text-surface-300 leading-none"
+                      ><ArrowUp size={11} /></button>
+                      <span className="text-xs text-surface-400 font-mono">{i + 1}</span>
+                      <button
+                        onClick={() => handleMoveTest(i, +1)}
+                        disabled={i === tests.length - 1 || running}
+                        title="Move down"
+                        className="text-surface-300 hover:text-purple-600 disabled:opacity-30 disabled:hover:text-surface-300 leading-none"
+                      ><ArrowDown size={11} /></button>
+                    </div>
                     {result ? (result.status === 'passed' ? <CheckCircle size={16} className="text-green-500 shrink-0" /> : <XCircle size={16} className="text-red-500 shrink-0" />) : (running ? <Loader2 size={16} className="animate-spin text-purple-400 shrink-0" /> : <Globe size={16} className="text-purple-400 shrink-0" />)}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
