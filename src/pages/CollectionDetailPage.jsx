@@ -773,6 +773,17 @@ function ApiBuilderModal({ onSave, onCancel, initialData }) {
                             Ingests every key/value under that body path into the chain cookie jar (turn on Auto cookie jar on the collection). Use for APIs that return cookies as JSON instead of <code>Set-Cookie</code>.
                           </p>
                         )}
+                        {!isBodyCookies && e.name && (
+                          <div className="text-[11px] text-purple-700/80 mt-1 pl-1 flex items-center gap-2">
+                            <span>Reference in the next test:</span>
+                            <code className="bg-white border border-purple-200 px-1.5 py-0.5 rounded font-mono text-[11px]">{`{{response.prev.${e.name}}}`}</code>
+                            <button
+                              type="button"
+                              onClick={() => { navigator.clipboard?.writeText(`{{response.prev.${e.name}}}`); }}
+                              className="text-purple-600 hover:text-purple-800 underline decoration-dotted"
+                            >Copy</button>
+                          </div>
+                        )}
                       </div>
                       );
                     })}
