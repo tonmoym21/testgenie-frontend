@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import Layout from '../components/Layout';
 import AddSourceModal from '../components/AddSourceModal';
 import { api } from '../services/api';
 import {
@@ -80,7 +79,7 @@ export default function ApiSourcesPage() {
   }
 
   return (
-    <Layout>
+    <>
       <div className="page">
         <div className="page-header">
           <div>
@@ -187,6 +186,6 @@ export default function ApiSourcesPage() {
           }}
         />
       )}
-    </Layout>
+    </>
   );
 }

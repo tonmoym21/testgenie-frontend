@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import Layout from '../components/Layout';
 import CommitToCollectionModal from '../components/CommitToCollectionModal';
 import { api } from '../services/api';
 import {
@@ -159,7 +158,7 @@ export default function ApiSourceDetailPage() {
   }
 
   return (
-    <Layout>
+    <>
       <div className="page">
         <div className="mb-4">
           <Link to="/sources" className="text-sm text-surface-500 hover:text-surface-800 inline-flex items-center gap-1">
@@ -326,6 +325,6 @@ export default function ApiSourceDetailPage() {
           }}
         />
       )}
-    </Layout>
+    </>
   );
 }
