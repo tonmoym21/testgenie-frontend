@@ -46,8 +46,35 @@ export default function ApiSourceDetailPage() {
   const [tagFilter, setTagFilter] = useState('ALL');
   const [collapsed, setCollapsed] = useState(() => new Set()); // collapsed tag groups
 
-  const [selected, setSelected] = useState(() => new Set());
+  // Selection persists to sessionStorage so an accidental nav / refresh
+  // doesn't nuke 20 minutes of curation. Keyed by sourceId so each source
+  // has its own staged selection.
+  const storageKey = `tf:sources:selected:${sourceId}`;
+  const [selected, setSelected] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      if (raw) return new Set(JSON.parse(raw));
+    } catch { /* ignore */ }
+    return new Set();
+  });
   const [showCommit, setShowCommit] = useState(false);
+
+  // Persist + before-unload guard for in-progress selections.
+  useEffect(() => {
+    try { sessionStorage.setItem(storageKey, JSON.stringify(Array.from(selected))); }
+    catch { /* quota / private mode — ignore */ }
+  }, [selected, storageKey]);
+
+  useEffect(() => {
+    function onBeforeUnload(e) {
+      if (selected.size > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    }
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [selected]);
 
   // Load once. Filtering is client-side — fast for the ~hundreds of
   // endpoints a typical spec carries. If the catalog grows past a few
@@ -204,8 +231,14 @@ export default function ApiSourceDetailPage() {
 
         {!loading && filtered.length === 0 && (
           <div className="empty">
-            <h3 className="text-lg font-semibold text-surface-800 mb-1">No endpoints match</h3>
-            <p className="text-surface-500 text-sm">Try clearing filters or refreshing the source.</p>
+            <h3 className="text-lg font-semibold text-surface-800 mb-1">
+              {endpoints.length === 0 ? 'This source has no endpoints' : 'No endpoints match'}
+            </h3>
+            <p className="text-surface-500 text-sm">
+              {endpoints.length === 0
+                ? 'The spec parsed to zero operations. Try refreshing the source or check the spec for path/method entries.'
+                : 'Try clearing the filters above.'}
+            </p>
           </div>
         )}
 
@@ -270,7 +303,7 @@ export default function ApiSourceDetailPage() {
               <span className="font-medium text-surface-800">
                 {selected.size} endpoint{selected.size === 1 ? '' : 's'} selected
               </span>
-              <button onClick={deselectAll} className="icon-btn" title="Clear selection">
+              <button onClick={deselectAll} className="icon-btn" title="Clear selection" aria-label="Clear selection">
                 <Trash2 size={14} />
               </button>
               <button onClick={() => setShowCommit(true)} className="btn-primary">
@@ -289,6 +322,7 @@ export default function ApiSourceDetailPage() {
           onCommitted={() => {
             setShowCommit(false);
             setSelected(new Set());
+            try { sessionStorage.removeItem(storageKey); } catch { /* ignore */ }
           }}
         />
       )}
