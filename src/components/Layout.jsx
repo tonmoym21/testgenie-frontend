@@ -5,7 +5,7 @@ import {
   FolderOpen, LogOut, Play, BarChart3, Zap, Library, Settings,
   Clock, Bot, Users, Search, ChevronsLeft, ChevronsRight, ChevronDown,
   ChevronRight, Sparkles, HelpCircle, FileText, ClipboardList, Puzzle,
-  BookOpen, Activity, Sun, Moon, ScrollText,
+  BookOpen, Activity, Sun, Moon, ScrollText, Cable,
 } from 'lucide-react';
 
 import { getCurrentProjectId } from '../utils/currentProject';
@@ -29,6 +29,7 @@ const NAV_GROUPS = [
       { path: '/dashboard', label: 'Dashboards', icon: BarChart3, match: ['/dashboard'] },
       { key: 'projects', label: 'Projects', icon: FolderOpen, parent: true,
         match: ['/projects', '/test-cases', '/test-runs', '/test-plans', '/reports', '/executions', '/stories', '/automation'] },
+      { path: '/sources', label: 'API Sources', icon: Cable, match: ['/sources'] },
       { path: '/integrations', label: 'Integrations', icon: Puzzle, match: ['/integrations', '/jira'] },
       { path: '/settings', label: 'Settings', icon: Settings, match: ['/settings', '/team', '/environments', '/globals'] },
       { path: '/audit-logs', label: 'Audit logs', icon: ScrollText, match: ['/audit-logs'], adminOnly: true },

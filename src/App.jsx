@@ -15,6 +15,8 @@ import ExecutionsPage from './pages/ExecutionsPage';
 import ExecutionDetailPage from './pages/ExecutionDetailPage';
 import CollectionsPage from './pages/CollectionsPage';
 import CollectionDetailPage from './pages/CollectionDetailPage';
+import ApiSourcesPage from './pages/ApiSourcesPage';
+import ApiSourceDetailPage from './pages/ApiSourceDetailPage';
 import EnvironmentsPage from './pages/EnvironmentsPage';
 import SchedulesPage from './pages/SchedulesPage';
 import AutomationPage from './pages/AutomationPage';
@@ -120,6 +122,8 @@ export default function App() {
       <Route path="/run-test" element={<Navigate to="/projects" replace />} />
       <Route path="/collections" element={<ProtectedRoute><CollectionsPage /></ProtectedRoute>} />
       <Route path="/collections/:collectionId" element={<ProtectedRoute><CollectionDetailPage /></ProtectedRoute>} />
+      <Route path="/sources" element={<ProtectedRoute><ApiSourcesPage /></ProtectedRoute>} />
+      <Route path="/sources/:sourceId" element={<ProtectedRoute><ApiSourceDetailPage /></ProtectedRoute>} />
       <Route path="/schedules" element={<ProtectedRoute><SchedulesPage /></ProtectedRoute>} />
       <Route path="/stories" element={<ProtectedRoute><StoriesPage /></ProtectedRoute>} />
       <Route path="/automation" element={<ProtectedRoute><AutomationPage /></ProtectedRoute>} />
